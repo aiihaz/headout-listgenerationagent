@@ -1,8 +1,9 @@
 # Headout AI Listing Generation Pipeline — Product Log
 
 > **Working directory**: `/Users/ihaz/Projects/list generation agent/`
-> **Last updated**: 2026-05-02 (Session 4)
-> **Status**: CLI pipeline complete. Frontend complete (all 6 screens, verified in browser). Backend not yet built — Phase 1 is next.
+> **Last updated**: 2026-05-02 (Session 5)
+> **Status**: CLI pipeline complete. Frontend complete (all 6 screens, verified in browser). Codebase on GitHub (`staging` branch). Backend not yet built — Phase 1 is next.
+> **Repo**: https://github.com/aiihaz/headout-listgenerationagent (default branch: `staging`)
 
 ---
 
@@ -445,6 +446,31 @@ All 6 screens built, verified in browser, production build passing. See "Fronten
 ---
 
 ## Session History
+
+### Session 5 — GitHub Setup (2026-05-02)
+
+Initialised git repository and pushed all 64 project files to GitHub in a single initial commit.
+
+**Repo**: https://github.com/aiihaz/headout-listgenerationagent
+
+**What was pushed:**
+- All Python pipeline code (`agents/`, `models/`, `orchestrator.py`, `generate_listing.py`)
+- All three agent system prompts (`agent_prompt_*.md`)
+- All engineering specs and API research docs
+- Complete React/Vite/TypeScript frontend (6 screens, Halyard fonts, all components)
+- Both example supplier inputs (`examples/`)
+- `.gitignore`, `.env.example`, `requirements.txt`
+- `listings/.gitkeep` — keeps the artifacts directory in the repo without committing generated run outputs
+
+**Branch structure decision:** Default branch is `staging` (WIP). `main` will be created from a clean merge when the product is ready to ship. `main` was deleted from remote after renaming.
+
+**.gitignore rules:**
+- `listings/*/` — generated run artifacts (intake.json, listing.json, etc.) are local-only
+- `frontend/node_modules/`, `frontend/dist/` — build outputs
+- `.env` — API key never committed; `.env.example` is the template
+- `.claude/`, `.playwright-mcp/`, `.DS_Store` — local tooling
+
+---
 
 ### Session 4 — Frontend Implementation (2026-05-02)
 
