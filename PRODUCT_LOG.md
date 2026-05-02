@@ -1,8 +1,8 @@
 # Headout AI Listing Generation Pipeline — Product Log
 
 > **Working directory**: `/Users/ihaz/Projects/list generation agent/`
-> **Last updated**: 2026-05-02 (Session 5)
-> **Status**: CLI pipeline complete. Frontend complete (all 6 screens, verified in browser). Codebase on GitHub (`staging` branch). Backend not yet built — Phase 1 is next.
+> **Last updated**: 2026-05-02 (Session 6)
+> **Status**: CLI pipeline complete. Frontend complete (all 6 screens, verified in browser). **Phase 1 backend skeleton complete** — FastAPI running, all endpoints responding, 4 CLI tests passing. Phase 2 (pipeline integration) is next.
 > **Repo**: https://github.com/aiihaz/headout-listgenerationagent (default branch: `staging`)
 
 ---
@@ -137,6 +137,30 @@ Design source: `experience-onboarding-agent/` bundle (Headout design system — 
 - No shadcn/ui — same reason. All components built from the Headout design spec.
 - Halyard fonts loaded from `public/fonts/` (bundled from the design export). No Google Fonts CDN dependency.
 - `FieldComponent` is the single most-used component; it owns all field states (editing, regenerating, resolved, source-open, confirm-regen) locally — no global state needed.
+
+### Backend — FastAPI (Phase 1)
+
+Located at `backend/`. Run with `uvicorn backend.main:app --reload`. Requires no Supabase config to start — filesystem fallback is active by default.
+
+| File | Role | Status |
+|---|---|---|
+| `backend/main.py` | FastAPI app, CORS middleware, `/health` endpoint | Done — 2026-05-02 |
+| `backend/config.py` | `pydantic-settings`: `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `ALLOWED_ORIGINS` | Done |
+| `backend/dependencies.py` | `get_current_user`: Supabase JWT validation; dev passthrough when Supabase not configured | Done |
+| `backend/routers/runs.py` | `POST /api/v1/runs`, `GET /api/v1/runs/:id`, `PATCH /api/v1/runs/:id/fields` | Done |
+| `backend/services/supabase_service.py` | `supabase_write_with_retry()` — 3-attempt retry + filesystem fallback; `insert_run`, `update_run_status`, `write_artifact`, `get_run_with_artifacts`, `resolve_field` | Done |
+| `supabase/migrations/001_initial_schema.sql` | `runs`, `run_artifacts`, `run_images`, `listings` tables + RLS on all 4 + `updated_at` trigger | Done |
+| `.github/workflows/keep-warm.yml` | Cron ping `/health` every 14 min — prevents Render free-tier cold starts | Done |
+| `tests/__init__.py` | Package marker | Done |
+| `tests/test_cli.py` | 4 pipeline invariant tests (no Supabase, no Gemini API required) — all passing | Done |
+
+**Dev mode behaviour:** If `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` are blank, the app runs without a database. `insert_run` writes a JSON file to `listings/{run_id}/runs_write.json`. `get_run_with_artifacts` reads from `listings/{run_id}/`. All endpoints respond normally.
+
+**Phase 1 done when:** `curl -X POST .../api/v1/runs` returns a `run_id` — verified locally (`{"run_id":"734f8da0-...","status":"pending"}`). ✓
+
+**Existing fix (same session):** `agents/email_generator.py` used `str | None` union syntax (Python 3.10+). Fixed to `Optional[str]` for Python 3.9 compatibility.
+
+---
 
 ### Artifacts Directory
 
@@ -355,18 +379,9 @@ Baked into `agent_prompt_content_generator.md` and `agent_prompt_review.md`. Qui
 
 The CLI pipeline runs end-to-end. The web layer architecture is decided. Build order:
 
-### Phase 1 — Backend skeleton (2–3 days)
+### Phase 1 — Backend skeleton ✅ COMPLETE (Session 6)
 
-| Component | Notes |
-|---|---|
-| `backend/main.py` | FastAPI app, CORS, health endpoint |
-| `backend/config.py` | Env vars via pydantic-settings |
-| `backend/dependencies.py` | Supabase JWT validation → `get_current_user` |
-| `backend/routers/runs.py` | POST /runs, GET /runs/:id (single JOIN), PATCH fields |
-| `backend/services/supabase_service.py` | `supabase_write_with_retry()` — 3-attempt retry + filesystem fallback |
-| `supabase/migrations/001_initial_schema.sql` | runs, run_artifacts, run_images, listings tables + RLS on all 4 |
-| `.github/workflows/keep-warm.yml` | Cron ping every 14 min to prevent Render cold start |
-| `tests/test_cli.py` | 4 pipeline invariant tests (no Supabase required) |
+All 8 components built, all 4 CLI tests passing, uvicorn smoke-tested locally. See "Backend — FastAPI (Phase 1)" in the File Inventory above for full detail.
 
 ### Phase 2 — Pipeline integration (2–3 days)
 
@@ -446,6 +461,28 @@ All 6 screens built, verified in browser, production build passing. See "Fronten
 ---
 
 ## Session History
+
+### Session 6 — Phase 1 Backend Skeleton (2026-05-02)
+
+Built the full FastAPI backend skeleton and CLI test suite. No pipeline execution yet — POST /runs creates a run record and returns a run_id; the background task wiring is Phase 2.
+
+**Files created:**
+- `backend/main.py`, `backend/config.py`, `backend/dependencies.py`
+- `backend/routers/runs.py` — `POST /api/v1/runs`, `GET /api/v1/runs/:id`, `PATCH /api/v1/runs/:id/fields`
+- `backend/services/supabase_service.py` — `supabase_write_with_retry()` with 3-attempt retry + filesystem fallback
+- `supabase/migrations/001_initial_schema.sql` — 4 tables, RLS on all, `updated_at` trigger
+- `.github/workflows/keep-warm.yml` — cron ping every 14 min
+- `tests/test_cli.py` — 4 passing invariant tests
+
+**Packages added to `requirements.txt`:** `fastapi`, `uvicorn[standard]`, `pydantic-settings`, `python-multipart`, `supabase`, `httpx`, `pytest`, `pytest-asyncio`
+
+**Bug fixed:** `agents/email_generator.py` used Python 3.10+ union syntax (`str | None`). Changed to `Optional[str]` for Python 3.9 compatibility.
+
+**Test results:** `4 passed in 2.34s` — no Supabase or Gemini API key required.
+
+**Smoke test:** `GET /health → {"status":"ok"}`, `POST /api/v1/runs → {"run_id":"...","status":"pending"}` verified locally.
+
+---
 
 ### Session 5 — GitHub Setup (2026-05-02)
 

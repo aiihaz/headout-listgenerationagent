@@ -4,11 +4,12 @@ No email service required — returns the draft as a string for display in the C
 """
 
 from datetime import date
+from typing import Optional
 
 from models.intake import AmbiguityFlag, AmbiguityType
 
 
-def draft_clarification_email(supplier_name: str, flags: list[AmbiguityFlag]) -> str | None:
+def draft_clarification_email(supplier_name: str, flags: list[AmbiguityFlag]) -> Optional[str]:
     actionable = [
         f for f in flags
         if f.type in (AmbiguityType.ABSENT, AmbiguityType.DEFERRED)
