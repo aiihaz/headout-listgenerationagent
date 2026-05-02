@@ -1,0 +1,142 @@
+/* ─── Halyard Fonts ────────────────────────────────────── */
+@font-face {
+  font-family: 'Halyard Display';
+  src: url('/fonts/HalyardDisplay-Regular.otf') format('opentype');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Halyard Display';
+  src: url('/fonts/HalyardDisplay-Medium.otf') format('opentype');
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Halyard Display';
+  src: url('/fonts/HalyardDisplay-SemiBold.otf') format('opentype');
+  font-weight: 600; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Halyard Display';
+  src: url('/fonts/HalyardDisplay-Bold.otf') format('opentype');
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Halyard Text';
+  src: url('/fonts/HalyardText-Regular.otf') format('opentype');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Halyard Text';
+  src: url('/fonts/HalyardText-Medium.otf') format('opentype');
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Halyard Text';
+  src: url('/fonts/HalyardText-Bold.otf') format('opentype');
+  font-weight: 600 700; font-style: normal; font-display: swap;
+}
+
+/* ─── Headout Design Tokens ────────────────────────────── */
+:root {
+  /* Fonts */
+  --font-display: 'Halyard Display', 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-text:    'Halyard Text', 'Plus Jakarta Sans', system-ui, sans-serif;
+
+  /* Brand */
+  --purps:    #8000FF;
+  --candy:    #FF5DA2;
+  --slate:    #111111;
+  --white:    #FFFFFF;
+  --dreamy:   #EFD9FF;
+
+  /* Ink scale */
+  --ink60:    #666666;
+  --ink30:    #B3B3B3;
+  --ink10:    #F4F4F4;
+
+  /* Surface */
+  --surface:  #F8F8F8;
+  --border:   #E5E5E5;
+
+  /* Status */
+  --green:    #2DCE6C;
+  --green-bg: #E6FAF0;
+  --red:      #E8281E;
+  --red-bg:   #FEF0EF;
+  --amber:    #F59E0B;
+  --amber-bg: #FEF3C7;
+  --ocean:    #0A84FF;
+  --link:     #0057D9;
+
+  /* Spacing */
+  --sp-1: 4px;   --sp-2: 8px;  --sp-3: 12px;
+  --sp-4: 16px;  --sp-5: 20px; --sp-6: 24px;
+  --sp-8: 32px;  --sp-12: 48px;
+
+  /* Radius */
+  --r-xs: 4px; --r-sm: 8px; --r-md: 12px;
+  --r-lg: 16px; --r-xl: 24px; --r-pill: 999px;
+
+  /* Shadows */
+  --shadow-card:  0 2px 8px rgba(0,0,0,0.08);
+  --shadow-modal: 0 8px 32px rgba(0,0,0,0.16);
+
+  /* Motion */
+  --motion-micro:    150ms ease-out;
+  --motion-standard: 220ms ease-in-out;
+}
+
+/* ─── Reset ────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-text);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--slate);
+  background: var(--surface);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+input, textarea, select, button { font-family: inherit; }
+button { cursor: pointer; }
+a { color: var(--link); }
+
+/* ─── Scrollbar ─────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #bbb; }
+
+/* ─── Animations ─────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position:  600px 0; }
+}
+@keyframes spin    { to { transform: rotate(360deg); } }
+@keyframes fadeIn  { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse   { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+@keyframes popIn   { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
+
+.fade-in { animation: fadeIn 220ms ease-out; }
+.pop-in  { animation: popIn  200ms ease-out; }
+
+.spinner {
+  width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.pulse-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--purps);
+  animation: pulse 1.2s ease-in-out infinite;
+}
