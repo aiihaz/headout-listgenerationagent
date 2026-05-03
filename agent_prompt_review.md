@@ -33,7 +33,7 @@ A single JSON review verdict. No preamble. No explanation outside the JSON.
         "id": "unique string e.g. B001",
         "field": "dot-notation path in generated JSON e.g. listing.description.full.section_2.body",
         "type": "hallucination | conditional_not_hedged | deferred_stated_as_fact | inclusion_not_in_intake | factual_mismatch | voice_violation | seo_violation | schema_error",
-        "action_required": "regenerate | raise_with_supplier | update_manually",
+        "action_required": "regenerate | associate_action",
         "found": "exact quote from generated content — the problematic text",
         "intake_says": "exact value or flag from intake JSON that contradicts or is missing",
         "severity": "blocker",
@@ -61,13 +61,11 @@ A single JSON review verdict. No preamble. No explanation outside the JSON.
 
 Every blocker must have `action_required` set to one of:
 
-- **`regenerate`** — The content generator made a quality error that it can fix by rewriting. Use this for: voice violations, SEO rule failures, hallucinated statistics, wrong numbers, wrong times, conditional inclusions without hedging. The pipeline will automatically regenerate this field.
+- **`regenerate`** — The content generator made a quality error it can fix by rewriting. Use this for: voice violations, SEO rule failures, hallucinated statistics, wrong numbers, wrong times, conditional inclusions without hedging. The pipeline will automatically attempt to regenerate this field. The associate can still override with either action button.
 
-- **`raise_with_supplier`** — The issue exists because the intake data is missing, ambiguous, or contradictory and only the supplier can resolve it. Use this for: inclusions mentioned in copy that are not in intake (supplier may offer it but didn't list it), contradictory data between intake fields that the content generator had to guess on, specific claims that cannot be verified against intake at all. The associate will be prompted to send a supplier clarification email.
+- **`associate_action`** — The issue requires a human decision. Use this for: intake data that is missing or ambiguous (supplier may need to clarify), contradictory data the content generator had to guess on, specific claims that cannot be verified against intake, or any fix where the correct answer is not derivable from the intake JSON alone. The pipeline surfaces this field to the associate without triggering a regen round-trip.
 
-- **`update_manually`** — The fix is a small, obvious correction the associate can make in seconds. Use this for: a single wrong word where the correct value is clear from intake, a formatting issue (spacing, capitalisation), a minor phrasing choice that doesn't require understanding the full listing context. Reserve this for genuinely trivial fixes — if the fix requires rewriting a full sentence, use `regenerate`.
-
-**Default rule**: When in doubt between `regenerate` and `raise_with_supplier`, use `regenerate`. The content generator can attempt a fix, and if it fails, the associate will review it. Only use `raise_with_supplier` when the intake data itself is the gap.
+**Default rule**: When in doubt, use `regenerate`. The pipeline will attempt a fix; if it fails, the associate reviews it. Only use `associate_action` when the intake data itself is the gap — i.e. no amount of rewriting will fix it without new information.
 
 ---
 
@@ -374,7 +372,7 @@ Example: "Human review required: the generated content states tower access is gu
 
 When `overall: "fail"`:
 
-`regeneration_scope` must list only the fields whose blocker has `action_required: "regenerate"`. Do not include fields where `action_required` is `raise_with_supplier` or `update_manually` — those are surfaced to the associate and do not trigger automated regeneration. Do not list the entire listing for regeneration.
+`regeneration_scope` must list only the fields whose blocker has `action_required: "regenerate"`. Do not include fields where `action_required: "associate_action"` — those are surfaced to the associate without triggering automated regeneration. Do not list the entire listing for regeneration.
 
 Example: if blockers are in `listing.description.full.section_2.body` and `listing.faqs[4].answer`, `regeneration_scope` is:
 ```json

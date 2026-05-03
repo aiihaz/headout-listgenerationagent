@@ -1,0 +1,318 @@
+{
+  "listing": {
+    "title": {
+      "primary": "Dune Bashing & BBQ Dinner — Evening Desert Safari in Dubai",
+      "ab_variant": "Experience Thrilling Dune Bashing & Dinner Under the Stars"
+    },
+    "tagline": "Feel the rush of dune bashing and savor a traditional BBQ dinner in the heart of the desert.",
+    "description": {
+      "short": {
+        "primary": "Get ready for an unforgettable evening in the Dubai Desert! Experience thrilling dune bashing, a camel ride, and a delicious BBQ dinner under the stars.",
+        "ab_variant": "Skip the ordinary and dive into an exhilarating desert adventure with dune bashing, camel rides, and a BBQ feast, all included!"
+      },
+      "full": {
+        "section_1": {
+          "header": "Adventure Awaits in the Dubai Desert",
+          "body": "Feel your heart race during 45 minutes of exhilarating dune bashing in a 4x4 Land Cruiser, where professional drivers navigate the stunning sandy landscapes. This isn't just a tour; it's a thrilling escape into the wild beauty of the Dubai Desert."
+        },
+        "section_2": {
+          "header": "Your Desert Experience Starts Here",
+          "body": "After your hotel pickup, you’ll be whisked away to our exclusive desert camp. Enjoy the adrenaline of dune bashing, then hop on a friendly camel for a lap around the camp. Want more? Grab the sandboarding gear and ride the dunes for an unforgettable adventure!"
+        },
+        "section_3": {
+          "header": "Savor the Desert Magic",
+          "body": "As the sun sets, indulge in a traditional Bedouin-style BBQ dinner featuring an array of grilled meats and refreshing drinks. Enjoy live entertainment with captivating belly dancing and the mesmerizing Tanoura show, creating a magical atmosphere that you won't soon forget."
+        },
+        "section_4": {
+          "header": "Logistics Made Easy",
+          "body": "Your adventure begins with a pickup from your Dubai city hotel at around 4:00 PM. Please be ready in the lobby by this time. Expect a seamless experience as you dive into the desert excitement!"
+        }
+      }
+    },
+    "highlights": [
+      "Dune bashing in 4x4 Land Cruisers",
+      "Traditional Bedouin-style BBQ dinner",
+      "Camel riding experience",
+      "Live entertainment with belly dancing",
+      "Sandboarding on the dunes",
+      "Stunning desert sunset views"
+    ],
+    "inclusions": [
+      "Hotel pickup and drop-off (Dubai city hotels only)",
+      "Dune bashing in shared 4x4 Land Cruiser",
+      "Camel riding (1 lap around the camp)",
+      "Sandboarding equipment",
+      "BBQ buffet dinner (halal certified)",
+      "Soft drinks, water, tea, coffee",
+      "Belly dancing and Tanoura show"
+    ],
+    "exclusions": [],
+    "important_information": [
+      "Please be ready in your hotel lobby by 4:00 PM for pickup. Drivers will not wait beyond 4:10 PM."
+    ],
+    "know_before_you_go": {
+      "what_to_bring": [
+        "Comfortable clothing and closed-toe shoes",
+        "Sunscreen and sunglasses"
+      ],
+      "whats_not_allowed": [
+        "Large bags or backpacks",
+        "Alcoholic beverages"
+      ],
+      "accessibility": "This experience involves some physical activity, including dune bashing, camel riding, and sandboarding. It may not be suitable for individuals with limited mobility. Please check with us if you have specific accessibility needs.",
+      "additional": [
+        "Free cancellation is available up to 24 hours before the tour start time.",
+        "Weather conditions may affect the tour schedule, so please check the forecast."
+      ]
+    },
+    "faqs": [
+      {
+        "question": "What time does the desert safari start?",
+        "answer": "The desert safari departs at 3:30 PM. Please be ready in your hotel lobby by 4:00 PM."
+      },
+      {
+        "question": "Is hotel pickup included?",
+        "answer": "Yes, hotel pickup and drop-off are included for Dubai city hotels."
+      },
+      {
+        "question": "What is the cancellation policy?",
+        "answer": "Free cancellation is available up to 24 hours before the tour start time."
+      },
+      {
+        "question": "Is this experience suitable for children?",
+        "answer": "Yes, children aged 3-11 can join the safari at a reduced price."
+      },
+      {
+        "question": "What should I wear for the desert safari?",
+        "answer": "We recommend wearing comfortable clothing and closed-toe shoes."
+      },
+      {
+        "question": "What if I miss the pickup time?",
+        "answer": "Guests who miss the 3:30 PM departure will not be accommodated on the same day."
+      },
+      {
+        "question": "Is the BBQ dinner halal?",
+        "answer": "Yes, the BBQ buffet dinner is halal certified."
+      }
+    ],
+    "seo": {
+      "title": "Evening Desert Safari with Dune Bashing in Dubai",
+      "meta_description": "Join an exhilarating evening desert safari in Dubai with dune bashing, camel rides, and a halal BBQ dinner. Book now for an unforgettable adventure!",
+      "tags": [
+        "desert-safari-dubai",
+        "dune-bashing-dubai",
+        "bbq-dinner-desert",
+        "camel-ride-dubai",
+        "dubai-adventures",
+        "evening-safari-dubai",
+        "live-entertainment-dubai",
+        "things-to-do-dubai"
+      ]
+    }
+  },
+  "variants": [
+    {
+      "name": "Adult",
+      "name_ab_variant": "Adults 12 and Up",
+      "tagline": "Perfect for those aged 12 and above, enjoy the full desert experience!",
+      "description": "For guests aged 12 and above, this ticket gives you full access to all activities.",
+      "key_differentiators": [
+        "Access to all desert activities",
+        "Perfect for adults looking for adventure",
+        "Includes BBQ dinner and live entertainment"
+      ],
+      "upsell_hook": null
+    },
+    {
+      "name": "Child",
+      "name_ab_variant": "Kids 3 to 11",
+      "tagline": "Special pricing for young adventurers aged 3 to 11.",
+      "description": "For children aged 3 to 11, this ticket ensures a fun-filled desert adventure at a reduced price.",
+      "key_differentiators": [
+        "Discounted rate for children",
+        "Includes camel ride and BBQ dinner",
+        "Fun activities tailored for younger guests"
+      ],
+      "upsell_hook": null
+    },
+    {
+      "name": "Infant",
+      "name_ab_variant": "Free Entry for Infants",
+      "tagline": "Infants aged 0 to 2 can join for free!",
+      "description": "For infants aged 0 to 2, enjoy free entry to the desert safari experience with adult supervision.",
+      "key_differentiators": [
+        "Free entry for infants",
+        "Family-friendly environment",
+        "Join the adventure with your parents"
+      ],
+      "upsell_hook": "Bring your little ones along for a family adventure without any extra cost!"
+    }
+  ],
+  "ab_test_plan": {
+    "priority_test": "title | short_description | variant_name",
+    "hypothesis": "The variant featuring the adventure-led title ('Experience Thrilling Dune Bashing & Dinner Under the Stars') will outperform the landmark-led title because it emphasizes the excitement of the experience, appealing more to thrill-seekers.",
+    "metric_to_watch": "CTR"
+  },
+  "publish_verdict": {
+    "ready": true,
+    "confidence": "high",
+    "blockers": [],
+    "warnings": [],
+    "copy_quality_score": {
+      "title": "pass",
+      "description": "pass",
+      "highlights": "pass",
+      "faqs": "pass",
+      "seo": "pass"
+    }
+  },
+  "structured_data": {
+    "json_ld": {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "TourActivity",
+          "name": "Evening Desert Safari with Dune Bashing, Camel Ride & BBQ Dinner in Dubai",
+          "description": "Experience the thrill of a Dubai Desert Safari with our flagship evening tour. Departing daily from Dubai city hotels, guests are picked up and driven to our private desert camp. Enjoy an exhilarating 45 minutes of dune bashing in 4x4 Land Cruisers driven by professional guides. After the adrenaline rush, ride friendly camels and try your hand at sandboarding. As the sun sets, indulge in a traditional Bedouin-style BBQ buffet dinner featuring a variety of grilled meats and refreshing beverages. The evening is filled with entertainment, including captivating belly dancing and a Tanoura show, making it a memorable desert adventure.",
+          "duration": "6 hours",
+          "additionalProperty": {
+            "@type": "PropertyValue",
+            "name": "weatherDependent",
+            "value": true
+          },
+          "location": {
+            "@type": "Place",
+            "name": "Dubai Desert Conservation Reserve"
+          },
+          "provider": {
+            "@type": "Organization",
+            "name": "Headout",
+            "url": "https://www.headout.com"
+          },
+          "offers": {
+            "@type": "Offer",
+            "priceCurrency": "AED",
+            "price": 275.0,
+            "priceSpecification": {
+              "@type": "PriceSpecification",
+              "description": "100% refund if cancelled 24+ hours before start"
+            }
+          },
+          "openingHoursSpecification": [
+            {
+              "@type": "OpeningHoursSpecification",
+              "opens": "15:30",
+              "closes": "23:59"
+            }
+          ],
+          "touristType": "DESERT_SAFARI"
+        },
+        {
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            {
+              "@type": "ListItem",
+              "position": 1,
+              "name": "Headout",
+              "item": "https://www.headout.com"
+            },
+            {
+              "@type": "ListItem",
+              "position": 2,
+              "name": "Dubai",
+              "item": "https://www.headout.com/dubai"
+            },
+            {
+              "@type": "ListItem",
+              "position": 3,
+              "name": "Desert_Safari",
+              "item": ""
+            },
+            {
+              "@type": "ListItem",
+              "position": 4,
+              "name": "Evening Desert Safari with Dune Bashing, Camel Ride & BBQ Dinner in Dubai"
+            }
+          ]
+        },
+        {
+          "@type": "FAQPage",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "What time does the desert safari start?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "The desert safari departs at 3:30 PM. Please be ready in your hotel lobby by 4:00 PM."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Is hotel pickup included?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes, hotel pickup and drop-off are included for Dubai city hotels."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "What is the cancellation policy?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Free cancellation is available up to 24 hours before the tour start time."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Is this experience suitable for children?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes, children aged 3-11 can join the safari at a reduced price."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "What should I wear for the desert safari?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "We recommend wearing comfortable clothing and closed-toe shoes."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "What if I miss the pickup time?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Guests who miss the 3:30 PM departure will not be accommodated on the same day."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Is the BBQ dinner halal?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes, the BBQ buffet dinner is halal certified."
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "canonical_strategy": {
+      "variant_canonicals": [
+        {
+          "variant_name": "Adult",
+          "canonical": "self-canonical"
+        },
+        {
+          "variant_name": "Child",
+          "canonical": "canonical-to-primary"
+        },
+        {
+          "variant_name": "Infant",
+          "canonical": "canonical-to-primary"
+        }
+      ]
+    }
+  }
+}

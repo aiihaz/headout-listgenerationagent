@@ -12,7 +12,7 @@ class ReviewBlocker(BaseModel):
     id: str
     field: str
     type: str
-    action_required: Optional[str] = "regenerate"
+    action_required: Optional[str] = "regenerate"  # "regenerate" | "associate_action"
     found: str
     intake_says: str
     severity: str = "blocker"

@@ -179,7 +179,7 @@ def run(
     # FAIL path — split blockers by action_required
     all_blockers = ctx.review.review.blockers
     regen_blockers = [b for b in all_blockers if b.action_required == "regenerate"]
-    associate_blockers = [b for b in all_blockers if b.action_required in ("raise_with_supplier", "update_manually")]
+    associate_blockers = [b for b in all_blockers if b.action_required == "associate_action"]
 
     # If every blocker is for the associate to resolve (no content to regenerate), surface to review
     if not regen_blockers:
