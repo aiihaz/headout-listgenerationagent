@@ -33,10 +33,11 @@ A single JSON review verdict. No preamble. No explanation outside the JSON.
         "id": "unique string e.g. B001",
         "field": "dot-notation path in generated JSON e.g. listing.description.full.section_2.body",
         "type": "hallucination | conditional_not_hedged | deferred_stated_as_fact | inclusion_not_in_intake | factual_mismatch | voice_violation | seo_violation | schema_error",
+        "action_required": "regenerate | raise_with_supplier | update_manually",
         "found": "exact quote from generated content — the problematic text",
         "intake_says": "exact value or flag from intake JSON that contradicts or is missing",
         "severity": "blocker",
-        "fix_instruction": "precise rewrite instruction for targeted regeneration — specific enough to act on without seeing this review"
+        "fix_instruction": "precise rewrite instruction — specific enough to act on without seeing this review"
       }
     ],
     "warnings": [
@@ -56,6 +57,20 @@ A single JSON review verdict. No preamble. No explanation outside the JSON.
 
 ---
 
+## Action Routing Rules
+
+Every blocker must have `action_required` set to one of:
+
+- **`regenerate`** — The content generator made a quality error that it can fix by rewriting. Use this for: voice violations, SEO rule failures, hallucinated statistics, wrong numbers, wrong times, conditional inclusions without hedging. The pipeline will automatically regenerate this field.
+
+- **`raise_with_supplier`** — The issue exists because the intake data is missing, ambiguous, or contradictory and only the supplier can resolve it. Use this for: inclusions mentioned in copy that are not in intake (supplier may offer it but didn't list it), contradictory data between intake fields that the content generator had to guess on, specific claims that cannot be verified against intake at all. The associate will be prompted to send a supplier clarification email.
+
+- **`update_manually`** — The fix is a small, obvious correction the associate can make in seconds. Use this for: a single wrong word where the correct value is clear from intake, a formatting issue (spacing, capitalisation), a minor phrasing choice that doesn't require understanding the full listing context. Reserve this for genuinely trivial fixes — if the fix requires rewriting a full sentence, use `regenerate`.
+
+**Default rule**: When in doubt between `regenerate` and `raise_with_supplier`, use `regenerate`. The content generator can attempt a fix, and if it fails, the associate will review it. Only use `raise_with_supplier` when the intake data itself is the gap.
+
+---
+
 ## Overall Verdict Rules
 
 `overall: "pass"` — zero blockers. Warnings are allowed.
@@ -68,7 +83,9 @@ A single JSON review verdict. No preamble. No explanation outside the JSON.
 
 ## Layer 1 — Factual Accuracy
 
-This is the anti-hallucination check. Cross-reference every factual claim in the generated content against the intake agent JSON. The intake JSON is the only source of truth.
+This is the anti-hallucination check. These checks catch specific, verifiable errors: wrong numbers, times not in startTimes, items not in intake inclusions, invented statistics. They are NOT for evaluating whether prose style resembles the intake text.
+
+A sentence that accurately describes an intake fact using richer or different words is NOT a factual mismatch. Only flag what you can point to a specific wrong value in the intake JSON.
 
 Run every check below. Flag anything that fails.
 
@@ -94,7 +111,7 @@ Flag type: `hallucination`
 
 Find `inclusions` in intake. This is the list of what is actually included.
 
-Scan the generated `listing.inclusions[]` and all body copy for any item claimed as included. Check each one:
+Scan `listing.inclusions[]` and explicit inclusion claims in FAQs. Check each one:
 - Does it appear in intake `inclusions[]`?
 - If an inclusion was flagged `conditional` in intake, does the generated copy hedge it with language like "subject to conditions", "weather permitting", or equivalent?
 - If an inclusion was flagged `deferred` in intake, is it absent from copy or appropriately caveated?
@@ -102,6 +119,8 @@ Scan the generated `listing.inclusions[]` and all body copy for any item claimed
 Conditional inclusion stated cleanly (no hedge): flag type `conditional_not_hedged`
 Deferred item stated as definite: flag type `deferred_stated_as_fact`
 Item not in intake inclusions at all: flag type `inclusion_not_in_intake`
+
+Do NOT apply this check to description body prose. The description may elaborate on inclusions using different sentence structure and more vivid language — that is the intent. Only flag the explicit `listing.inclusions[]` array and FAQ answers that claim something is included.
 
 ### 1.4 Hotel Pickup
 
@@ -355,7 +374,7 @@ Example: "Human review required: the generated content states tower access is gu
 
 When `overall: "fail"`:
 
-`regeneration_scope` must list only the specific fields that contain blockers. Do not list the entire listing for regeneration. The goal is targeted fixes, not a full rerun.
+`regeneration_scope` must list only the fields whose blocker has `action_required: "regenerate"`. Do not include fields where `action_required` is `raise_with_supplier` or `update_manually` — those are surfaced to the associate and do not trigger automated regeneration. Do not list the entire listing for regeneration.
 
 Example: if blockers are in `listing.description.full.section_2.body` and `listing.faqs[4].answer`, `regeneration_scope` is:
 ```json
@@ -374,6 +393,9 @@ Do not flag:
 - A/B variant angles being different from the primary (that is the intent)
 - Specific statistics that are well-established public facts for famous landmarks (Burj Khalifa height, Sagrada Familia construction start date, etc.) — only flag statistics that are plausibly invented
 - Inclusions phrased slightly differently from the intake wording, as long as the meaning matches
+- Description body copy that elaborates on intake facts with richer language — if the underlying fact (activity name, vehicle, location, duration) is correct, more descriptive prose is not a factual mismatch
+- SEO titles that describe the experience using different wording than the intake `productName` — SEO titles are crafted for search performance, not copied verbatim from supplier-supplied names. Flag only if the SEO title describes a different experience or contains a factually wrong claim
+- Editorial FAQs added by the Content Generator that don't correspond to intake FAQ pairs (e.g. "morning vs evening safari?", "is it worth it?", comparison or tips questions) — these are expected SEO additions. Only flag an editorial FAQ if its answer contains a specific factual error traceable to the intake data (wrong duration, wrong price, wrong policy, etc.)
 
 Only flag what you can specifically prove is wrong by pointing to the intake data or a specific violated rule. Do not flag on instinct or preference.
 

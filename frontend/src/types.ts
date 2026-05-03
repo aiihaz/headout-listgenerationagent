@@ -64,6 +64,7 @@ export interface ReviewBlocker {
   id: string;
   field: string;
   type: string;
+  action_required: 'regenerate' | 'raise_with_supplier' | 'update_manually';
   found: string;
   intake_says: string;
   severity: string;
@@ -118,6 +119,7 @@ export interface FieldData {
   reason?: string;       // why this needs review
   caveat?: string;       // caveat message
   source: string | null; // null = agent inferred
+  action?: 'regenerate' | 'raise_with_supplier' | 'update_manually';
 }
 
 export interface ProcessData {

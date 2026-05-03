@@ -14,6 +14,10 @@ function fixReason(fieldPath: string, blockers: ReviewBlocker[]): string | undef
   return blockers.find(b => b.field.includes(fieldPath))?.fix_instruction;
 }
 
+function fieldAction(fieldPath: string, blockers: ReviewBlocker[]): ReviewBlocker['action_required'] | undefined {
+  return blockers.find(b => b.field.includes(fieldPath))?.action_required;
+}
+
 function fixCaveat(fieldPath: string, warnings: ReviewWarning[]): string | undefined {
   return warnings.find(w => w.field.includes(fieldPath))?.message;
 }
@@ -59,6 +63,7 @@ export function mapRunToReviewData(
     reason: fixReason(`highlights[${i}]`, blockers),
     caveat: fixCaveat(`highlights[${i}]`, warnings),
     source: sourceLabel(sources, 'highlights'),
+    action: fieldAction(`highlights[${i}]`, blockers),
   } satisfies FieldData));
 
   const inclusions = ((listing.inclusions as string[]) ?? []).map((inc, i) => ({
@@ -68,6 +73,7 @@ export function mapRunToReviewData(
     status: fieldStatus(`inclusions[${i}]`, blockers, warnings),
     reason: fixReason(`inclusions[${i}]`, blockers),
     source: sourceLabel(sources, 'inclusions'),
+    action: fieldAction(`inclusions[${i}]`, blockers),
   } satisfies FieldData));
 
   const exclusions = ((listing.exclusions as string[]) ?? []).map((ex, i) => ({
@@ -77,6 +83,7 @@ export function mapRunToReviewData(
     status: fieldStatus(`exclusions[${i}]`, blockers, warnings),
     reason: fixReason(`exclusions[${i}]`, blockers),
     source: sourceLabel(sources, 'exclusions'),
+    action: fieldAction(`exclusions[${i}]`, blockers),
   } satisfies FieldData));
 
   type FaqItem = { question: string; answer: string; paa_source?: string };
@@ -91,6 +98,7 @@ export function mapRunToReviewData(
       source: faq.paa_source
         ? `Google users also ask: "${faq.paa_source}"`
         : sourceLabel(sources, 'faqs'),
+      action: fieldAction(`faqs[${i}].question`, blockers),
     } satisfies FieldData,
     {
       id: `fa${i + 1}`,
@@ -101,6 +109,7 @@ export function mapRunToReviewData(
       source: faq.paa_source
         ? `Google users also ask: "${faq.paa_source}"`
         : sourceLabel(sources, 'faqs'),
+      action: fieldAction(`faqs[${i}].answer`, blockers),
     } satisfies FieldData,
   ]);
 
@@ -121,6 +130,7 @@ export function mapRunToReviewData(
       reason: fixReason('listing.title', blockers),
       caveat: fixCaveat('listing.title', warnings),
       source: sourceLabel(sources, 'productName'),
+      action: fieldAction('listing.title', blockers),
     },
     descHook: {
       label: 'Description hook',
@@ -130,6 +140,7 @@ export function mapRunToReviewData(
       reason: fixReason('listing.description', blockers),
       caveat: fixCaveat('listing.description', warnings),
       source: sourceLabel(sources, 'description'),
+      action: fieldAction('listing.description', blockers),
     },
     highlights,
     inclusions,
@@ -142,6 +153,7 @@ export function mapRunToReviewData(
       status: fieldStatus('cancellationPolicy', blockers, warnings),
       reason: fixReason('cancellationPolicy', blockers),
       source: sourceLabel(sources, 'cancellationPolicy'),
+      action: fieldAction('cancellationPolicy', blockers),
     },
     seoNote: {
       id: 'seo',
@@ -150,6 +162,7 @@ export function mapRunToReviewData(
       status: fieldStatus('seo', blockers, warnings),
       reason: fixReason('seo', blockers),
       source: null,
+      action: fieldAction('seo', blockers),
     },
   };
 }

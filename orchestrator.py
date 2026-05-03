@@ -176,7 +176,19 @@ def run(
         _save_final(run_dir, ctx)
         return _result(ctx)
 
-    # FAIL path — targeted regeneration
+    # FAIL path — split blockers by action_required
+    all_blockers = ctx.review.review.blockers
+    regen_blockers = [b for b in all_blockers if b.action_required == "regenerate"]
+    associate_blockers = [b for b in all_blockers if b.action_required in ("raise_with_supplier", "update_manually")]
+
+    # If every blocker is for the associate to resolve (no content to regenerate), surface to review
+    if not regen_blockers:
+        ctx.state = PipelineState.READY_FOR_PUBLISH
+        ctx.finished_at = datetime.now(timezone.utc).isoformat()
+        _notify(ctx.state, status_callback)
+        _save_final(run_dir, ctx)
+        return _result(ctx)
+
     if ctx.review.review.escalate_to_human:
         ctx.state = PipelineState.ESCALATED_TO_HUMAN
         _notify(ctx.state, status_callback)
@@ -185,8 +197,8 @@ def run(
 
     ctx.state = PipelineState.REGENERATION_IN_PROGRESS
     _notify(ctx.state, status_callback)
-    blockers = [b.model_dump() for b in ctx.review.review.blockers]
-    scope = ctx.review.review.regeneration_scope
+    blockers = [b.model_dump() for b in regen_blockers]
+    scope = [b.field for b in regen_blockers]
 
     try:
         regen_listing = content_generator.run_targeted_regen(
@@ -213,7 +225,8 @@ def run(
         _save_escalation(run_dir, ctx)
         return _result(ctx)
 
-    if ctx.review.review.overall in ("pass", "conditional_pass"):
+    post_regen_regen = [b for b in ctx.review.review.blockers if b.action_required == "regenerate"]
+    if ctx.review.review.overall in ("pass", "conditional_pass") or not post_regen_regen:
         ctx.state = PipelineState.READY_FOR_PUBLISH
     else:
         ctx.state = PipelineState.ESCALATED_TO_HUMAN

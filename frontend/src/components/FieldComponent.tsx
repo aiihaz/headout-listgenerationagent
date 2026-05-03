@@ -282,20 +282,24 @@ export function FieldComponent({ field, showSource = true, onResolve }: FieldCom
               {field.source && <p style={{ fontSize: 12, color: 'var(--ink60)', fontStyle: 'italic', marginBottom: 10 }}>"{field.source}"</p>}
               {!resolved && (
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  <button onClick={() => setEditing(true)} style={{
-                    height: 30, padding: '0 12px', background: '#fff', color: 'var(--slate)',
-                    border: '1px solid var(--border)', borderRadius: 6, fontSize: 12, fontWeight: 500,
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
-                  }}>
-                    <Pencil size={12} /> Update manually
-                  </button>
-                  <button onClick={handleRaiseWithSupplier} style={{
-                    height: 30, padding: '0 12px', background: '#fff', color: 'var(--slate)',
-                    border: '1px solid var(--border)', borderRadius: 6, fontSize: 12, fontWeight: 500,
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
-                  }}>
-                    <Send size={12} /> Raise with supplier
-                  </button>
+                  {field.action !== 'raise_with_supplier' && (
+                    <button onClick={() => setEditing(true)} style={{
+                      height: 30, padding: '0 12px', background: '#fff', color: 'var(--slate)',
+                      border: '1px solid var(--border)', borderRadius: 6, fontSize: 12, fontWeight: 500,
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+                    }}>
+                      <Pencil size={12} /> Update manually
+                    </button>
+                  )}
+                  {field.action !== 'update_manually' && (
+                    <button onClick={handleRaiseWithSupplier} style={{
+                      height: 30, padding: '0 12px', background: '#fff', color: 'var(--slate)',
+                      border: '1px solid var(--border)', borderRadius: 6, fontSize: 12, fontWeight: 500,
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+                    }}>
+                      <Send size={12} /> Raise with supplier
+                    </button>
+                  )}
                 </div>
               )}
             </div>
