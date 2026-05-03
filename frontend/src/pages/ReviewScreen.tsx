@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, ChevronRight, Eye, Send, AlertTriangle, CheckCircle,
-  ArrowRight, X, Check, Plus, FileText, ExternalLink,
+  ArrowRight, X, Check, Plus,
 } from 'lucide-react';
 import { FieldComponent } from '../components/FieldComponent';
 import { api } from '../lib/api';
@@ -134,6 +134,7 @@ export function ReviewScreen() {
       seoNote: REVIEW_DATA.seoNote,
     } satisfies ReviewData
   );
+  const [supplierName, setSupplierName] = useState<string>('');
   const [flags, setFlags] = useState(TOTAL_FLAGS);
   const [loadingRun, setLoadingRun] = useState(!!runId);
   const [resolvedSections, setResolvedSections] = useState<Record<string, number>>({});
@@ -142,6 +143,7 @@ export function ReviewScreen() {
     if (!runId) return;
     setLoadingRun(true);
     api.getRun(runId).then(run => {
+      if (run.supplier_name) setSupplierName(run.supplier_name);
       const merged = run.artifacts?.merged_listing as Record<string, unknown> | undefined;
       if (merged) {
         // Attach review blockers/warnings from review artifact if present
@@ -235,10 +237,12 @@ export function ReviewScreen() {
         }}>
           <ChevronLeft size={14} color="var(--purps)" /> Listings
         </button>
+        {supplierName && (<><ChevronRight size={13} color="var(--ink60)" />
+        <span style={{ fontSize: 13, color: 'var(--ink60)' }}>{supplierName}</span></>)}
         <ChevronRight size={13} color="var(--ink60)" />
-        <span style={{ fontSize: 13, color: 'var(--ink60)' }}>Athens Heritage Group</span>
-        <ChevronRight size={13} color="var(--ink60)" />
-        <span style={{ fontSize: 13, fontWeight: 500 }}>Acropolis & Parthenon Tickets with Audio Guide</span>
+        <span style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 320 }}>
+          {reviewData.title.options?.[0] ?? reviewData.title.value ?? 'Untitled listing'}
+        </span>
         <span style={{ flex: 1 }} />
         <button style={{
           height: 32, padding: '0 14px', background: 'transparent', color: 'var(--purps)',
@@ -347,7 +351,7 @@ export function ReviewScreen() {
                 </div>
                 <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Request sent</h3>
                 <p style={{ fontSize: 14, color: 'var(--ink60)', lineHeight: 1.6, marginBottom: 8 }}>
-                  Athens Heritage Group has been notified and will receive a form to submit clarifications for the {FLAG_LIST.length} flagged items.
+                  {supplierName || 'The supplier'} has been notified and will receive a form to submit clarifications for the {FLAG_LIST.length} flagged items.
                 </p>
                 <p style={{ fontSize: 12, color: 'var(--ink30)', marginBottom: 28 }}>You'll be notified when they respond.</p>
                 <button onClick={() => { setSupplierModalOpen(false); setSupplierSent(false); }} style={{
@@ -362,8 +366,8 @@ export function ReviewScreen() {
                 <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                   <div>
                     <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink60)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Supplier clarification request</p>
-                    <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700 }}>Athens Heritage Group</h3>
-                    <p style={{ fontSize: 13, color: 'var(--ink60)', marginTop: 2 }}>Acropolis & Parthenon Tickets with Audio Guide</p>
+                    <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700 }}>{supplierName || 'Supplier'}</h3>
+                    <p style={{ fontSize: 13, color: 'var(--ink60)', marginTop: 2 }}>{reviewData.title.options?.[0] ?? reviewData.title.value ?? ''}</p>
                   </div>
                   <button onClick={() => setSupplierModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink60)', padding: 4, borderRadius: 6, display: 'flex' }}>
                     <X size={18} />
@@ -511,36 +515,13 @@ export function ReviewScreen() {
         </Section>
 
         <Section id="s-seo">
-          <FieldComponent field={reviewData.seoNote} showSource={showSourceQuotes} />
+          <FieldComponent field={reviewData.seoNote} showSource={showSourceQuotes} onResolve={() => markSectionResolved('s-seo')} />
         </Section>
 
         <Section id="s-cancel">
           <FieldComponent field={reviewData.cancellation} showSource={showSourceQuotes} />
         </Section>
 
-        {/* Source files */}
-        <div style={{ marginTop: 8, marginBottom: 32, padding: 16, background: '#fff', border: '1px solid var(--border)', borderRadius: 10 }}>
-          <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink60)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>Source files</p>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {[{ name: 'Supplier Spec.pdf', pages: '8 pages' }, { name: 'FAQ Document.docx', pages: '3 pages' }].map(f => (
-              <button key={f.name} style={{
-                display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px',
-                background: 'var(--surface)', border: '1px solid var(--border)',
-                borderRadius: 8, cursor: 'pointer', textAlign: 'left', transition: 'background 120ms',
-              }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'var(--dreamy)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'var(--surface)')}
-              >
-                <FileText size={13} color="var(--purps)" />
-                <div>
-                  <p style={{ fontSize: 12, fontWeight: 500 }}>{f.name}</p>
-                  <p style={{ fontSize: 11, color: 'var(--ink60)' }}>{f.pages}</p>
-                </div>
-                <ExternalLink size={11} color="var(--ink30)" />
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );

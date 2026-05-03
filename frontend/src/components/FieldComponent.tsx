@@ -122,9 +122,9 @@ export function FieldComponent({ field, showSource = true, onResolve }: FieldCom
               }}>
                 <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink60)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Source quote</p>
                 {field.source ? (
-                  <p style={{ fontSize: 12, color: 'var(--slate)', lineHeight: 1.5, fontStyle: 'italic' }}>"{field.source}"</p>
+                  <p style={{ fontSize: 12, color: 'var(--slate)', lineHeight: 1.5, fontStyle: 'italic' }}>{field.source}</p>
                 ) : (
-                  <p style={{ fontSize: 12, color: 'var(--ink60)', lineHeight: 1.5 }}>No source — agent inferred this field.</p>
+                  <p style={{ fontSize: 12, color: 'var(--ink60)', lineHeight: 1.5 }}>AI-generated — no direct supplier quote.</p>
                 )}
               </div>
             )}

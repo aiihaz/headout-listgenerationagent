@@ -25,10 +25,17 @@ function fixCaveat(fieldPath: string, warnings: ReviewWarning[]): string | undef
 function sourceLabel(sources: Record<string, string>, path: string): string | null {
   const type = sources?.[path];
   if (!type) return null;
-  if (type === 'EXPLICIT') return 'Supplier data (explicit)';
-  if (type === 'INFERRED') return 'Agent inferred from context';
+  if (type === 'EXPLICIT') return 'From supplier input';
+  if (type === 'INFERRED') return 'Inferred from supplier context';
   if (type === 'DEFAULT') return 'Pipeline default';
   if (type === 'AGENT-GENERATED') return 'AI-generated';
+  return type;
+}
+
+function formatCancelType(type: string): string {
+  if (type === 'FREE_CANCELLATION') return 'Free cancellation';
+  if (type === 'PARTIAL_REFUND') return 'Partial refund';
+  if (type === 'NO_REFUND') return 'Non-refundable';
   return type;
 }
 
@@ -114,8 +121,16 @@ export function mapRunToReviewData(
   ]);
 
   const cancellationPolicy = (intakePayload.cancellationPolicy as Record<string, unknown>) ?? {};
-  const cancelText = cancellationPolicy.type
-    ? `${cancellationPolicy.type} — ${cancellationPolicy.refundPercentage ?? 0}% refund, ${cancellationPolicy.cutoffHours ?? 0}h cutoff`
+  const cancelType = cancellationPolicy.type as string | undefined;
+  const cancelText = cancelType
+    ? (() => {
+        const label = formatCancelType(cancelType);
+        const pct = cancellationPolicy.refundPercentage as number | undefined;
+        const hours = cancellationPolicy.cutoffHours as number | undefined;
+        if (cancelType === 'FREE_CANCELLATION') return hours ? `${label} up to ${hours}h before` : label;
+        if (cancelType === 'NO_REFUND') return label;
+        return `${label}${pct != null ? ` — ${pct}% back` : ''}${hours != null ? ` if cancelled ${hours}h before` : ''}`;
+      })()
     : 'Not specified';
 
   const seoObj = listing.seo as Record<string, unknown> | undefined;

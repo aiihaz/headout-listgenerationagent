@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { TopNav } from './components/TopNav';
 import { Dashboard } from './pages/Dashboard';
 import { UploadScreen } from './pages/UploadScreen';
@@ -42,7 +42,6 @@ function AppShell() {
 
 export function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
     if (!supabase) {
@@ -54,7 +53,6 @@ export function App() {
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsAuthenticated(!!session);
-      if (!session) navigate('/dashboard');
     });
     return () => subscription.unsubscribe();
   }, []);
