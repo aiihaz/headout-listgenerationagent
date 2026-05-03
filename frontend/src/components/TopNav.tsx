@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Check, LogOut } from 'lucide-react';
-import { signOut } from '../lib/supabase';
+import { signOut, supabase } from '../lib/supabase';
 
 interface TopNavProps {
   autoSave?: boolean;
@@ -9,6 +9,22 @@ interface TopNavProps {
 export function TopNav({ autoSave }: TopNavProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const [initials, setInitials] = useState('');
+  const [displayName, setDisplayName] = useState('');
+
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.auth.getSession().then(({ data }) => {
+      const user = data.session?.user;
+      if (!user) return;
+      const fullName = user.user_metadata?.full_name as string | undefined;
+      const email = user.email ?? '';
+      const name = fullName || email.split('@')[0];
+      const parts = name.split(/[\s._-]+/).filter(Boolean);
+      setInitials(parts.slice(0, 2).map(p => p[0].toUpperCase()).join('') || '?');
+      setDisplayName(fullName || email);
+    });
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -49,7 +65,7 @@ export function TopNav({ autoSave }: TopNavProps) {
             outline: open ? '2px solid var(--purps)' : 'none',
             outlineOffset: 2, transition: 'outline 100ms',
           }}
-        >IH</span>
+        >{initials || '?'}</span>
 
         {open && (
           <div style={{
@@ -60,7 +76,7 @@ export function TopNav({ autoSave }: TopNavProps) {
             overflow: 'hidden', zIndex: 100,
           }}>
             <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--slate)' }}>Ihaz I.</p>
+              <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--slate)' }}>{displayName || '—'}</p>
               <p style={{ fontSize: 11, color: 'var(--ink60)', marginTop: 2 }}>Listing Agent</p>
             </div>
             <button

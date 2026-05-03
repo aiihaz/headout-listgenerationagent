@@ -1,10 +1,26 @@
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Check, ExternalLink, Settings, Plus } from 'lucide-react';
+import { api } from '../lib/api';
 
 export function PublishedScreen() {
+  const { id: runId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const onDashboard = () => navigate('/dashboard');
   const onAnother = () => navigate('/new');
+
+  const [title, setTitle] = useState('');
+
+  useEffect(() => {
+    if (!runId) return;
+    api.getRun(runId).then(run => {
+      const merged = run.artifacts?.merged_listing as Record<string, unknown> | undefined;
+      const listing = (merged?.listing ?? {}) as Record<string, unknown>;
+      const titleObj = listing.title as Record<string, string> | undefined;
+      setTitle(titleObj?.primary ?? run.supplier_name ?? '');
+    }).catch(() => {});
+  }, [runId]);
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
       <div className="pop-in" style={{ textAlign: 'center', maxWidth: 480 }}>
@@ -17,7 +33,7 @@ export function PublishedScreen() {
         </div>
 
         <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, marginBottom: 8 }}>
-          Acropolis & Parthenon Tickets is live
+          {title ? <>{title} is live</> : 'Listing is live'}
         </h2>
         <p style={{ fontSize: 15, color: 'var(--ink60)', lineHeight: 1.6, marginBottom: 28 }}>
           Your listing has been published and is now visible to customers on Headout.

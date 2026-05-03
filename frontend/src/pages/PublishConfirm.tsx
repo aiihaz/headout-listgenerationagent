@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Send } from 'lucide-react';
+import { api } from '../lib/api';
 
 const CHECKLIST = [
   'I have reviewed all flagged fields — all issues are resolved.',
@@ -17,6 +18,38 @@ export function PublishConfirm() {
   const allChecked = checks.every(Boolean);
   const toggle = (i: number) => setChecks(c => c.map((v, j) => j === i ? !v : v));
 
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [city, setCity] = useState('');
+  const [variantCount, setVariantCount] = useState<number | null>(null);
+  const [caveatCount, setCaveatCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!runId) return;
+    api.getRun(runId).then(run => {
+      const merged = run.artifacts?.merged_listing as Record<string, unknown> | undefined;
+      const listing = (merged?.listing ?? {}) as Record<string, unknown>;
+      const intake = (merged?.intake_payload ?? {}) as Record<string, unknown>;
+
+      const titleObj = listing.title as Record<string, string> | undefined;
+      setTitle(titleObj?.primary ?? run.supplier_name ?? '');
+
+      const descObj = listing.description as Record<string, unknown> | undefined;
+      const shortDesc = descObj?.short as Record<string, string> | undefined;
+      setDescription(shortDesc?.primary ?? '');
+
+      const cityVal = intake.city;
+      setCity(typeof cityVal === 'string' ? cityVal : (cityVal as { name?: string } | undefined)?.name ?? '');
+
+      const variants = intake.variants as unknown[] | undefined;
+      setVariantCount(variants?.length ?? null);
+
+      const reviewArtifact = run.artifacts?.review as Record<string, unknown> | undefined;
+      const warnings = ((reviewArtifact?.review as Record<string, unknown> | undefined)?.warnings) as unknown[] | undefined;
+      setCaveatCount(warnings?.length ?? null);
+    }).catch(() => {});
+  }, [runId]);
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', padding: 24 }}>
       <div className="pop-in" style={{ width: 580, background: '#fff', borderRadius: 16, boxShadow: '0 4px 24px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
@@ -30,14 +63,20 @@ export function PublishConfirm() {
           {/* Summary */}
           <div style={{ border: '1.5px solid var(--border)', borderRadius: 10, padding: 16, marginBottom: 20 }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink60)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>Listing summary</p>
-            <p style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>Acropolis & Parthenon Tickets with Audio Guide</p>
-            <p style={{ fontSize: 13, color: 'var(--ink60)', lineHeight: 1.5, marginBottom: 12 }}>
-              Stand atop the most iconic hill in Athens and explore the Acropolis at your own pace, with a multilingual audio guide narrating every column, frieze, and myth.
-            </p>
-            <div style={{ display: 'flex', gap: 20, fontSize: 12, color: 'var(--ink60)' }}>
-              <span><b style={{ color: 'var(--slate)' }}>City:</b> Athens</span>
-              <span><b style={{ color: 'var(--slate)' }}>Variants:</b> 2 SKUs</span>
-              <span><b style={{ color: 'var(--slate)' }}>Caveats:</b> 2 notes</span>
+            {title ? (
+              <p style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>{title}</p>
+            ) : (
+              <div style={{ height: 22, width: 240, borderRadius: 6, background: 'var(--ink10)', marginBottom: 6, animation: 'shimmer 1.4s ease-in-out infinite' }} />
+            )}
+            {description ? (
+              <p style={{ fontSize: 13, color: 'var(--ink60)', lineHeight: 1.5, marginBottom: 12 }}>{description}</p>
+            ) : (
+              <div style={{ height: 36, borderRadius: 6, background: 'var(--ink10)', marginBottom: 12, animation: 'shimmer 1.4s ease-in-out infinite' }} />
+            )}
+            <div style={{ display: 'flex', gap: 20, fontSize: 12, color: 'var(--ink60)', flexWrap: 'wrap' }}>
+              {city && <span><b style={{ color: 'var(--slate)' }}>City:</b> {city}</span>}
+              {variantCount != null && <span><b style={{ color: 'var(--slate)' }}>Variants:</b> {variantCount} SKU{variantCount !== 1 ? 's' : ''}</span>}
+              {caveatCount != null && caveatCount > 0 && <span><b style={{ color: 'var(--slate)' }}>Caveats:</b> {caveatCount} note{caveatCount !== 1 ? 's' : ''}</span>}
             </div>
           </div>
 
