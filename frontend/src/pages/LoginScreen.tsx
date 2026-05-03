@@ -10,6 +10,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [imgLoaded, setImgLoaded] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,8 +33,11 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
   return (
     <div className="login-page">
       <div className="login-shell fade-in">
-        <div className="login-visual" aria-hidden="true">
-          <img src="/create.png" alt="" />
+        <div className="login-visual" aria-hidden="true" style={{ opacity: imgLoaded ? 1 : 0, transition: 'opacity 300ms ease' }}>
+          <picture>
+            <source srcSet="/create.webp" type="image/webp" />
+            <img src="/create.png" alt="" onLoad={() => setImgLoaded(true)} />
+          </picture>
         </div>
 
         <section className="login-panel" aria-label="Sign in">

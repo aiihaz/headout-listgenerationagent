@@ -4,6 +4,8 @@ import { api } from '../lib/api';
 import type { ListingRow, ApiRun } from '../types';
 import { runStatusToListingStatus } from '../types';
 
+const CACHE_KEY = 'dashboard_runs_cache';
+
 const STATUSES = ['All', 'Draft', 'Processing', 'In Review', 'Ready', 'Published', 'Failed'] as const;
 type StatusFilter = typeof STATUSES[number];
 
@@ -62,18 +64,27 @@ interface DashboardProps {
 export function Dashboard({ onNew, onOpen }: DashboardProps) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('All');
-  const [listings, setListings] = useState<ListingRow[]>([]);
+  const [listings, setListings] = useState<ListingRow[]>(() => {
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      return cached ? (JSON.parse(cached) as ListingRow[]) : [];
+    } catch {
+      return [];
+    }
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchRuns = async () => {
-    setLoading(true);
+  const fetchRuns = async (showLoading = true) => {
+    if (showLoading && listings.length === 0) setLoading(true);
     setError(null);
     try {
       const runs = await api.listRuns();
-      setListings(runs.map(rowFromApiRun));
+      const rows = runs.map(rowFromApiRun);
+      setListings(rows);
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify(rows)); } catch {}
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load listings');
+      if (listings.length === 0) setError(e instanceof Error ? e.message : 'Failed to load listings');
     } finally {
       setLoading(false);
     }
@@ -96,8 +107,8 @@ export function Dashboard({ onNew, onOpen }: DashboardProps) {
           <p style={{ fontSize: 13, color: 'var(--ink60)', marginTop: 2 }}>{listings.length} total</p>
         </div>
         <span style={{ flex: 1 }} />
-        <button onClick={fetchRuns} title="Refresh" style={{ background: 'none', border: '1.5px solid var(--border)', borderRadius: 8, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-          <RefreshCw size={14} color="var(--ink60)" />
+        <button onClick={() => fetchRuns(false)} title="Refresh" style={{ background: 'none', border: '1.5px solid var(--border)', borderRadius: 8, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <RefreshCw size={14} color={loading ? 'var(--purps)' : 'var(--ink60)'} style={{ transition: 'color 150ms', animation: loading ? 'spin 0.8s linear infinite' : 'none' }} />
         </button>
         <div style={{ position: 'relative' }}>
           <Search size={14} color="var(--ink60)" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
@@ -138,15 +149,31 @@ export function Dashboard({ onNew, onOpen }: DashboardProps) {
 
       {/* Table */}
       <div style={{ flex: 1, overflow: 'auto', padding: '16px 32px 32px' }}>
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '80px 0', color: 'var(--ink60)' }}>
-            <p style={{ fontSize: 13 }}>Loading listings…</p>
-          </div>
+        {loading && listings.length === 0 ? (
+          <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                {['Experience', 'Status', 'Updated', 'Assigned'].map(h => (
+                  <th key={h} style={{ padding: '11px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: 'var(--ink60)', letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i} style={{ borderBottom: i < 4 ? '1px solid var(--border)' : 'none' }}>
+                  <td style={{ padding: '13px 16px' }}><span style={{ display: 'block', height: 13, width: `${140 + (i % 3) * 60}px`, borderRadius: 6, background: 'var(--ink10)', animation: 'shimmer 1.4s ease-in-out infinite' }} /></td>
+                  <td style={{ padding: '13px 16px' }}><span style={{ display: 'block', height: 22, width: 72, borderRadius: 999, background: 'var(--ink10)', animation: 'shimmer 1.4s ease-in-out infinite' }} /></td>
+                  <td style={{ padding: '13px 16px' }}><span style={{ display: 'block', height: 13, width: 56, borderRadius: 6, background: 'var(--ink10)', animation: 'shimmer 1.4s ease-in-out infinite' }} /></td>
+                  <td style={{ padding: '13px 16px' }}><span style={{ display: 'block', width: 26, height: 26, borderRadius: '50%', background: 'var(--ink10)', animation: 'shimmer 1.4s ease-in-out infinite' }} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         ) : error ? (
           <div style={{ textAlign: 'center', padding: '80px 0', color: 'var(--red)' }}>
             <p style={{ fontWeight: 500 }}>Failed to load listings</p>
             <p style={{ fontSize: 13, marginTop: 4 }}>{error}</p>
-            <button onClick={fetchRuns} style={{ marginTop: 16, padding: '8px 20px', background: 'var(--purps)', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Retry</button>
+            <button onClick={() => fetchRuns()} style={{ marginTop: 16, padding: '8px 20px', background: 'var(--purps)', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Retry</button>
           </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>

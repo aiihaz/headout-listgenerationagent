@@ -1,8 +1,8 @@
 # Headout AI Listing Generation Pipeline — Product Log
 
 > **Working directory**: `/Users/ihaz/Projects/list generation agent/`
-> **Last updated**: 2026-05-04 (Session 15)
-> **Status**: CLI pipeline complete and **verified end-to-end with OpenAI**. Frontend complete (all 6 screens, wired to real API, **deployed to Vercel**). Backend complete (Phases 1–2), **deployed to Render**. Full production stack live. Two escalation bugs fixed: orchestrator now always attempts regen before escalating on first review pass; `escalated_to_human` runs now route to review screen instead of a blocking error popup. **Frontend: https://headout-listing-agent.vercel.app | Backend: https://headout-listgenerationagent.onrender.com**
+> **Last updated**: 2026-05-04 (Session 16)
+> **Status**: CLI pipeline complete and **verified end-to-end with OpenAI**. Frontend complete (all 6 screens, wired to real API, **deployed to Vercel**). Backend complete (Phases 1–2), **deployed to Render**. Full production stack live. Two performance fixes applied: login image 94% smaller (WebP) with preload + opacity fade-in; dashboard has localStorage stale-while-revalidate for instant repeat loads + skeleton UI. **Frontend: https://headout-listing-agent.vercel.app | Backend: https://headout-listgenerationagent.onrender.com**
 > **Repo**: https://github.com/aiihaz/headout-listgenerationagent (default branch: `staging`)
 
 ---
@@ -512,6 +512,41 @@ All 6 screens built, verified in browser, production build passing. See "Fronten
 
 ## Session History
 
+### Session 16 — Performance Fixes: Login Image + Dashboard Load (2026-05-04)
+
+Fixed two UX performance issues that made the app feel slow on first load.
+
+**Fix 1 — Login page: 4.7 MB PNG → 280 KB WebP with preload + opacity fade-in**
+
+Root cause: `create.png` was a 4.7 MB raw PNG with no compression and no preload hint. On a typical connection the hero image would arrive several seconds after paint, causing a jarring pop-in on the left panel.
+
+Changes:
+- Converted `create.png` → `create.webp` using `cwebp -q 82` — 94% smaller (280 KB), visually identical
+- Added `<link rel="preload" as="image" href="/create.webp" type="image/webp">` to `index.html` so the browser fetches the image in parallel with JS, not after
+- Wrapped the `<img>` in a `<picture>` element with WebP source + PNG fallback for older browsers
+- Added `imgLoaded` state in `LoginScreen.tsx`: the visual panel starts at `opacity: 0` and transitions to `1` via `onLoad` — no placeholder is shown, the panel simply fades in when ready
+
+**Fix 2 — Dashboard: localStorage stale-while-revalidate + skeleton UI**
+
+Root cause: on every visit the dashboard rendered a blank screen while waiting for the Render API to respond (cold starts can be 3–5 s). No cache, no placeholder.
+
+Changes:
+- Added `CACHE_KEY = 'dashboard_runs_cache'` in `Dashboard.tsx`
+- `useState` lazy initializer reads from `localStorage` — cached rows are painted instantly on repeat visits
+- `fetchRuns` writes fresh rows back to cache after every successful fetch
+- Background refresh (triggered by `useEffect` on mount) never shows a spinner if stale data is already rendered; the refresh icon spins purple while fetching in the background
+- First-ever visit (no cache) shows a shimmer skeleton table — matching the real table columns (Experience, Status, Updated, Assigned) so there is no layout shift when data arrives
+- Fixed TypeScript error: Retry button changed from `onClick={fetchRuns}` to `onClick={() => fetchRuns()}` after function signature gained a default param
+
+**Files modified:**
+- `frontend/public/create.webp` — new WebP asset (94% smaller than PNG)
+- `frontend/index.html` — preload hint for WebP
+- `frontend/src/index.css` — added `.login-visual picture` display rule; removed `background: var(--dreamy)` from `.login-visual` (no visible placeholder during load)
+- `frontend/src/pages/LoginScreen.tsx` — `<picture>` element, `imgLoaded` state, opacity fade-in
+- `frontend/src/pages/Dashboard.tsx` — localStorage cache, skeleton table, spinning refresh icon, Retry fix
+
+---
+
 ### Session 15 — Escalation Routing Fixes (2026-05-04)
 
 Fixed two bugs that together caused every run with real review blockers to dead-end instead of reaching the Review Screen.
@@ -534,7 +569,7 @@ Fix: moved `escalated_to_human` to `TERMINAL_OK`. It now triggers `onDone()` and
 - `orchestrator.py` — removed first-pass `escalate_to_human` immediate escalation; added comment explaining the intent
 - `frontend/src/types.ts` — `escalated_to_human` moved from `TERMINAL_FAIL` to `TERMINAL_OK`
 
-**Commits:** `195f08b`, `335e8cc` — both pushed to `staging`, Render redeployed, Vercel redeployed.
+**Commits:** `195f08b`, `335e8cc` — both pushed to `staging`. Vercel redeployed (force deploy via `npx vercel --prod --force`). Render deployment status uncertain — see deployment note below.
 
 ---
 
