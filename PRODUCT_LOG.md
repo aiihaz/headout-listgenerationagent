@@ -1,8 +1,8 @@
 # Headout AI Listing Generation Pipeline — Product Log
 
 > **Working directory**: `/Users/ihaz/Projects/list generation agent/`
-> **Last updated**: 2026-05-03 (Session 13)
-> **Status**: CLI pipeline complete and **verified end-to-end with OpenAI**. Frontend complete (all 6 screens, wired to real API, **deployed to Vercel**). Backend complete (Phases 1–2). OpenAI migration complete — model corrected to `gpt-4o-mini`, Pydantic models hardened for LLM output variance. **Serper API SEO intelligence integrated** — PAA → FAQ seeds, competitor titles → A/B context, related searches → tag candidates, Layer 3 check 9. **Frontend live at https://headout-listing-agent.vercel.app**. Backend deploy to Render is next.
+> **Last updated**: 2026-05-04 (Session 14)
+> **Status**: CLI pipeline complete and **verified end-to-end with OpenAI**. Frontend complete (all 6 screens, wired to real API, **deployed to Vercel**). Backend complete (Phases 1–2), **deployed to Render**. Full production stack live. Review Agent recalibrated — false positives fixed, blockers now routed as `regenerate` vs `associate_action` so the orchestrator only auto-regens content quality issues; supplier/manual items surface directly to the associate. **Frontend: https://headout-listing-agent.vercel.app | Backend: https://headout-listgenerationagent.onrender.com**
 > **Repo**: https://github.com/aiihaz/headout-listgenerationagent (default branch: `staging`)
 
 ---
@@ -54,7 +54,7 @@ python3 generate_listing.py --input examples/supplier_happy_path.txt --output my
 |---|---|---|
 | `agent_prompt_supplier_intake.md` | Intake Agent system prompt | Complete — updated 2026-05-02 |
 | `agent_prompt_content_generator.md` | Content Generator system prompt | Complete |
-| `agent_prompt_review.md` | Review Agent system prompt | Complete |
+| `agent_prompt_review.md` | Review Agent system prompt; Layer 1 scope tightened (description prose not checked against intake field values); SEO title vs `productName` false positive excluded; editorial FAQs excluded from factual mismatch checks; `action_required: regenerate\|associate_action` field added to blocker schema with routing rules | Complete — updated 2026-05-04 |
 
 ### Engineering Specs
 
@@ -91,7 +91,7 @@ python3 generate_listing.py --input examples/supplier_happy_path.txt --output my
 | `requirements.txt` | `openai`, pydantic, typer, rich, python-dotenv | Done |
 | `models/intake.py` | Pydantic models: IntakeResult, IntakeMeta, AmbiguityFlag, DesignDecision | Done |
 | `models/listing.py` | Pydantic models: ListingOutput, Listing, Variant, FAQ (+ `paa_source`), SEO, PublishVerdict; `_coerce_str_to_list` validator on all `list[str]` fields; `CopyQualityScore` fields and `copy_quality_score` made optional with defaults | Done — updated 2026-05-03 |
-| `models/review.py` | Pydantic models: ReviewOutput, ReviewDetail, ReviewBlocker, ReviewWarning | Done |
+| `models/review.py` | Pydantic models: ReviewOutput, ReviewDetail, ReviewBlocker, ReviewWarning; `action_required: Optional[str] = "regenerate"` added to `ReviewBlocker` | Done — updated 2026-05-04 |
 | `models/serper.py` | Pydantic models: SerperContext, SerperOrganic | Done — 2026-05-03 |
 | `models/__init__.py` | Package exports — includes SerperContext, SerperOrganic | Done — updated 2026-05-03 |
 | `agents/llm_client.py` | Shared OpenAI Responses API JSON helper; default/per-agent model env vars; default model corrected to `gpt-4o-mini` | Done — 2026-05-03 |
@@ -102,7 +102,7 @@ python3 generate_listing.py --input examples/supplier_happy_path.txt --output my
 | `agents/review_agent.py` | OpenAI Responses API call, auto-escalates on second review pass; accepts `serper_context` and injects keyword signal / skip note | Done — updated 2026-05-03 |
 | `agents/duplicate_detector.py` | difflib similarity check against `listings/` directory | Done |
 | `agents/email_generator.py` | Formats ambiguity_flags → supplier clarification email draft | Done |
-| `orchestrator.py` | 15-state pipeline machine, saves all artifacts per run; serper step between intake and generation | Done — updated 2026-05-03 |
+| `orchestrator.py` | 15-state pipeline machine, saves all artifacts per run; serper step between intake and generation; splits Review Agent blockers by `action_required` — only `regenerate` blockers trigger targeted regen, `associate_action` blockers surface to associate without regen round-trip | Done — updated 2026-05-04 |
 | `generate_listing.py` | Typer CLI with Rich console output | Done |
 | `examples/supplier_happy_path.txt` | Dubai Desert Safari — clean input with CONDITIONAL tower access | Done |
 | `examples/supplier_contradiction.txt` | Same supplier — pickup time contradicted (3:30 PM vs 4:00 PM) | Done |
@@ -122,12 +122,12 @@ Design source: `experience-onboarding-agent/` bundle (Headout design system — 
 | `frontend/public/logo.svg` | Headout logo | Done |
 | `frontend/public/fonts/` | Halyard Display + Halyard Text (.otf) | Done |
 | `frontend/src/index.css` | Headout design tokens: CSS custom properties, font faces, animations | Done |
-| `frontend/src/types.ts` | TypeScript types: Screen, FieldData, ListingRow, ProcessData, RunStatus (includes `serper_in_progress`, `serper_complete`, `serper_skipped`), etc. | Done — updated 2026-05-03 |
+| `frontend/src/types.ts` | TypeScript types: Screen, FieldData, ListingRow, ProcessData, RunStatus (includes `serper_in_progress`, `serper_complete`, `serper_skipped`), etc.; `ReviewBlocker.action_required: 'regenerate' \| 'associate_action'`; `FieldData.action` added | Done — updated 2026-05-04 |
 | `frontend/src/main.tsx` | React root | Done |
 | `frontend/src/App.tsx` | Screen router (dashboard → upload → processing → review → publish → published) | Done |
 | `frontend/src/components/TopNav.tsx` | Nav bar: logo, "Listing Agent" label, autosave indicator, user avatar | Done |
 | `frontend/src/components/StatusPill.tsx` | Ready / Caveat added / Needs review pill with hover tooltip | Done |
-| `frontend/src/components/FieldComponent.tsx` | Core field: A/B/C tab switcher, inline edit, source quote popover, regenerate confirm, flag detail expander, "Raise with supplier" | Done |
+| `frontend/src/components/FieldComponent.tsx` | Core field: A/B/C tab switcher, inline edit, source quote popover, regenerate confirm, flag detail expander; always shows both "Update manually" and "Raise with supplier" — associate chooses whichever fits their context | Done — updated 2026-05-04 |
 | `frontend/src/pages/Dashboard.tsx` | Screen 1: listings table, status pills with flag counts, search, status filters | Done |
 | `frontend/src/pages/UploadScreen.tsx` | Screen 2: paste tab + file drag-and-drop + supplier autocomplete dropdown | Done |
 | `frontend/src/pages/ProcessingScreen.tsx` | Screen 3: animated stage stepper (6 stages), live progress bar, context line; stage 2 updated to "Researching search landscape" covering serper states | Done — updated 2026-05-03 |
@@ -464,9 +464,9 @@ All 6 screens built, verified in browser, production build passing. See "Fronten
 | Login screen | ✅ Done (Session 9) | `LoginScreen.tsx` — Supabase Auth email/password |
 | Error boundaries on every screen | ✅ Done (Session 9) | `ErrorBoundary` wraps all screens in `App.tsx` |
 | Frontend API wiring (all 6 screens) | ✅ Done (Session 9) | Upload, Processing, Dashboard, Review wired to real API |
-| Frontend deploy — Vercel | ✅ Done (Session 12) | https://headout-listing-agent.vercel.app — `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` set; `VITE_API_URL` pending Render URL |
-| Backend deploy — Render | ⬜ Next | Set env vars: `OPENAI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `ALLOWED_ORIGINS`=Vercel URL; then update `VITE_API_URL` on Vercel |
-| Supabase migration — production | ⬜ Next | Run `supabase/migrations/001_initial_schema.sql` against production project |
+| Frontend deploy — Vercel | ✅ Done (Session 12) | https://headout-listing-agent.vercel.app |
+| Backend deploy — Render | ✅ Done (Session 14) | https://headout-listgenerationagent.onrender.com — all env vars set; `VITE_API_URL` pointed at Render; health confirmed `{"status":"ok"}` |
+| Supabase migration — production | ✅ Done (Session 14) | `001_initial_schema.sql` applied; serper states + `serper_context` artifact type added; `model` column default corrected to `gpt-4o-mini` |
 
 ### Ongoing (not blocking)
 
@@ -511,6 +511,54 @@ All 6 screens built, verified in browser, production build passing. See "Fronten
 ---
 
 ## Session History
+
+### Session 14 — Production Deploy + Review Agent Recalibration (2026-05-04)
+
+Completed full production deploy across all three services and fixed a systematic false-positive escalation bug in the Review Agent.
+
+**Production deploy:**
+- Supabase: applied corrective migration adding `serper_in_progress`, `serper_complete`, `serper_skipped` to the `runs.status` CHECK constraint; added `serper_context` to `run_artifacts.type` CHECK constraint; corrected `model` column default from `gemini-2.5-flash` to `gpt-4o-mini`
+- Render: backend deployed at https://headout-listgenerationagent.onrender.com — all env vars set (`OPENAI_API_KEY`, `SERPER_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `ALLOWED_ORIGINS`); health endpoint confirmed live
+- Vercel: `VITE_API_URL` set to Render URL; frontend redeployed; full stack confirmed end-to-end
+
+**Review Agent false positive fix (`agent_prompt_review.md`):**
+
+Root cause: the first live smoke test escalated to human (`escalated_to_human`) on a clean Dubai Desert Safari input. Four blockers were returned — three were false positives:
+- B001: description prose flagged as `factual_mismatch` because it used more words than the intake field value. Not a factual error.
+- B002: SEO title flagged because it differed from intake `productName`. No rule requires SEO title to match `productName`.
+- B004: editorial FAQ (`"morning vs evening safari?"`) flagged as mismatch against an unrelated intake FAQ entry.
+
+Fixes applied to `agent_prompt_review.md`:
+- Layer 1 intro strengthened: checks catch specific wrong values, not prose style differences
+- Section 1.3 scope restricted to `listing.inclusions[]` and FAQ answers only — description body prose explicitly excluded
+- "What NOT to Flag" section expanded with three new explicit exclusions: description elaboration, SEO title wording, editorial FAQs
+
+**Blocker action routing (`models/review.py`, `orchestrator.py`, frontend):**
+
+Introduced `action_required: "regenerate" | "associate_action"` field on every Review Agent blocker:
+- `regenerate` — content quality issue the model can fix by rewriting; orchestrator auto-regenerates
+- `associate_action` — requires human decision (missing/ambiguous intake data); surfaces to associate without triggering a regen round-trip
+
+Orchestrator updated to split blockers by `action_required` before deciding whether to run targeted regeneration. If all blockers are `associate_action`, the run moves to `ready_for_publish` immediately and the associate resolves them via the Review Screen. Second regen pass also checks for remaining `regenerate` blockers before escalating.
+
+Frontend: `ReviewBlocker.action_required` and `FieldData.action` added to types; `mapRunToReviewData.ts` propagates `action` to every field; `FieldComponent` always shows both "Update manually" and "Raise with supplier" — associate picks whichever fits their context.
+
+**Files modified:**
+- `agent_prompt_review.md` — Layer 1 scope, "What NOT to Flag", blocker schema, `action_required` routing rules, regeneration scope rules
+- `models/review.py` — `action_required: Optional[str] = "regenerate"` on `ReviewBlocker`
+- `orchestrator.py` — blocker split by `action_required`; `associate_action` items bypass regen
+- `frontend/src/types.ts` — `ReviewBlocker.action_required`, `FieldData.action`
+- `frontend/src/lib/mapRunToReviewData.ts` — `fieldAction()` helper; `action` on all field objects
+- `frontend/src/components/FieldComponent.tsx` — both action buttons always shown
+
+**Test results:** `16 passed in 2.06s` — no regressions.
+
+**Live stack:**
+- Frontend: https://headout-listing-agent.vercel.app
+- Backend: https://headout-listgenerationagent.onrender.com
+- Database: Supabase project `feigtkfpvfaugwmgkwxm` (ap-northeast-1)
+
+---
 
 ### Session 13 — Serper API SEO Integration (2026-05-03)
 
