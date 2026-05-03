@@ -1,8 +1,8 @@
 # Headout AI Listing Generation Pipeline — Product Log
 
 > **Working directory**: `/Users/ihaz/Projects/list generation agent/`
-> **Last updated**: 2026-05-04 (Session 14)
-> **Status**: CLI pipeline complete and **verified end-to-end with OpenAI**. Frontend complete (all 6 screens, wired to real API, **deployed to Vercel**). Backend complete (Phases 1–2), **deployed to Render**. Full production stack live. Review Agent recalibrated — false positives fixed, blockers now routed as `regenerate` vs `associate_action` so the orchestrator only auto-regens content quality issues; supplier/manual items surface directly to the associate. **Frontend: https://headout-listing-agent.vercel.app | Backend: https://headout-listgenerationagent.onrender.com**
+> **Last updated**: 2026-05-04 (Session 15)
+> **Status**: CLI pipeline complete and **verified end-to-end with OpenAI**. Frontend complete (all 6 screens, wired to real API, **deployed to Vercel**). Backend complete (Phases 1–2), **deployed to Render**. Full production stack live. Two escalation bugs fixed: orchestrator now always attempts regen before escalating on first review pass; `escalated_to_human` runs now route to review screen instead of a blocking error popup. **Frontend: https://headout-listing-agent.vercel.app | Backend: https://headout-listgenerationagent.onrender.com**
 > **Repo**: https://github.com/aiihaz/headout-listgenerationagent (default branch: `staging`)
 
 ---
@@ -102,7 +102,7 @@ python3 generate_listing.py --input examples/supplier_happy_path.txt --output my
 | `agents/review_agent.py` | OpenAI Responses API call, auto-escalates on second review pass; accepts `serper_context` and injects keyword signal / skip note | Done — updated 2026-05-03 |
 | `agents/duplicate_detector.py` | difflib similarity check against `listings/` directory | Done |
 | `agents/email_generator.py` | Formats ambiguity_flags → supplier clarification email draft | Done |
-| `orchestrator.py` | 15-state pipeline machine, saves all artifacts per run; serper step between intake and generation; splits Review Agent blockers by `action_required` — only `regenerate` blockers trigger targeted regen, `associate_action` blockers surface to associate without regen round-trip | Done — updated 2026-05-04 |
+| `orchestrator.py` | 15-state pipeline machine, saves all artifacts per run; serper step between intake and generation; splits Review Agent blockers by `action_required` — only `regenerate` blockers trigger targeted regen, `associate_action` blockers surface to associate without regen round-trip; first-pass `escalate_to_human` no longer short-circuits regen — regen always runs when `regenerate` blockers exist | Done — updated 2026-05-04 |
 | `generate_listing.py` | Typer CLI with Rich console output | Done |
 | `examples/supplier_happy_path.txt` | Dubai Desert Safari — clean input with CONDITIONAL tower access | Done |
 | `examples/supplier_contradiction.txt` | Same supplier — pickup time contradicted (3:30 PM vs 4:00 PM) | Done |
@@ -122,7 +122,7 @@ Design source: `experience-onboarding-agent/` bundle (Headout design system — 
 | `frontend/public/logo.svg` | Headout logo | Done |
 | `frontend/public/fonts/` | Halyard Display + Halyard Text (.otf) | Done |
 | `frontend/src/index.css` | Headout design tokens: CSS custom properties, font faces, animations | Done |
-| `frontend/src/types.ts` | TypeScript types: Screen, FieldData, ListingRow, ProcessData, RunStatus (includes `serper_in_progress`, `serper_complete`, `serper_skipped`), etc.; `ReviewBlocker.action_required: 'regenerate' \| 'associate_action'`; `FieldData.action` added | Done — updated 2026-05-04 |
+| `frontend/src/types.ts` | TypeScript types: Screen, FieldData, ListingRow, ProcessData, RunStatus (includes `serper_in_progress`, `serper_complete`, `serper_skipped`), etc.; `ReviewBlocker.action_required: 'regenerate' \| 'associate_action'`; `FieldData.action` added; `escalated_to_human` moved from `TERMINAL_FAIL` to `TERMINAL_OK` | Done — updated 2026-05-04 |
 | `frontend/src/main.tsx` | React root | Done |
 | `frontend/src/App.tsx` | Screen router (dashboard → upload → processing → review → publish → published) | Done |
 | `frontend/src/components/TopNav.tsx` | Nav bar: logo, "Listing Agent" label, autosave indicator, user avatar | Done |
@@ -511,6 +511,32 @@ All 6 screens built, verified in browser, production build passing. See "Fronten
 ---
 
 ## Session History
+
+### Session 15 — Escalation Routing Fixes (2026-05-04)
+
+Fixed two bugs that together caused every run with real review blockers to dead-end instead of reaching the Review Screen.
+
+**Bug 1 — Orchestrator: first-pass `escalate_to_human` short-circuited regen (`orchestrator.py`)**
+
+Root cause: the orchestrator's FAIL path checked `ctx.review.review.escalate_to_human` after confirming there were `regenerate` blockers, then escalated immediately. This meant any first-pass review where the Review Agent was cautious (3+ blockers of any kind) would escalate without ever attempting targeted regeneration. Regen — which uses `fix_instruction` per blocker to correct the exact wrong values — was never given a chance.
+
+Fix: removed the `escalate_to_human` guard from the first-pass FAIL path entirely. The orchestrator now always runs targeted regen when `regenerate` blockers exist. The second pass escalates if blockers remain — this is the correct and intended behaviour. `escalate_to_human` on a first pass reflects Review Agent caution about content quality, not an issue regen cannot resolve.
+
+Confirmed root cause using a saved escalation record: Review Agent correctly flagged "45 minutes of dune bashing" (hallucinated — intake says 6-hour total) and "4:00 PM pickup" (wrong — intake says 15:30). Both are fixable by regen with the supplied `fix_instruction`. The old orchestrator escalated before trying.
+
+**Bug 2 — Frontend: `escalated_to_human` showed error popup instead of routing to Review Screen (`frontend/src/types.ts`)**
+
+Root cause: `escalated_to_human` was in `TERMINAL_FAIL`. `ProcessingScreen` polls run status and on `TERMINAL_FAIL` renders a "Pipeline failed" error card with a "Back to dashboard" button — blocking the associate from ever reaching the Review Screen.
+
+Fix: moved `escalated_to_human` to `TERMINAL_OK`. It now triggers `onDone()` and the app navigates to the Review Screen, where the associate can see all flagged fields and take action. `intake_failed` and `generation_blocked` remain the only true failure states.
+
+**Files modified:**
+- `orchestrator.py` — removed first-pass `escalate_to_human` immediate escalation; added comment explaining the intent
+- `frontend/src/types.ts` — `escalated_to_human` moved from `TERMINAL_FAIL` to `TERMINAL_OK`
+
+**Commits:** `195f08b`, `335e8cc` — both pushed to `staging`, Render redeployed, Vercel redeployed.
+
+---
 
 ### Session 14 — Production Deploy + Review Agent Recalibration (2026-05-04)
 
