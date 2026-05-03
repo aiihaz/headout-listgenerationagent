@@ -107,7 +107,7 @@ A single JSON object matching this exact schema. Every field is required unless 
       }
     },
     "highlights": [
-      "string — exactly 6 bullets, 10-15 words each. Lead with verb or specific fact. No bullet starting with same word."
+      "string — exactly 6 bullets, 2-8 words each. Lead with verb or specific fact. No bullet starting with same word."
     ],
     "inclusions": [
       "string — each item is a plain noun phrase. No 'if option selected' language — only list what's in THIS variant."
@@ -169,6 +169,20 @@ A single JSON object matching this exact schema. Every field is required unless 
 
 ---
 
+## Reading the Intake Payload
+
+The intake JSON you receive uses this structure. Read it correctly before writing:
+
+- **`variants[*].pricing[]`** — array of `{ageGroup, pricePerUnit, currencyCode, minAge, maxAge}`. Use `ADULT` price for the primary price. If `INFANT` has `pricePerUnit: 0`, call out free infant entry.
+- **`city`** — object `{code, name}`. Use `city.name` for copy.
+- **`tourType`** — one of `GUIDED_TOUR`, `SHOW_OR_EVENT`, `ATTRACTION_TICKET`, `DESERT_SAFARI`, `COMBO_TICKET`. Adjust tone accordingly.
+- **`durationText`** — use this for copy ("2 hours", "full day"). Fall back to converting `duration` ms if absent.
+- **`cancellationPolicy.refundPercentage`** — use the actual percentage (100 = free cancellation, 50 = partial, 0 = non-refundable).
+- **`inputFields[]`** — note any required fields (hotel name, meal preference) and mention them in `know_before_you_go` if customer-facing.
+- **`weatherDependent: true`** — add a `know_before_you_go.additional` item about weather cancellation policy.
+
+---
+
 ## Writing Rules — Applied Per Field
 
 ### Title (primary + A/B variant)
@@ -212,7 +226,7 @@ Rules:
 ### Highlights (exactly 6)
 
 Each highlight must:
-- Be 10-15 words
+- Be 2-8 words
 - Start with a different verb or specific fact from the others
 - Contain one concrete detail (a number, a specific feature name, a comparison)
 - Not duplicate information from another highlight
@@ -247,7 +261,7 @@ Section headers must tease the content, not label it:
 - ✗ "About this experience"
 - ✗ "Your visit"
 
-### FAQs (minimum 6, maximum 8)
+### FAQs (minimum 7, maximum 8)
 
 Every listing must include FAQs covering:
 1. The most practical logistics question (pickup, meeting point, how to get there)
@@ -257,6 +271,8 @@ Every listing must include FAQs covering:
 5. Cancellation policy — phrased as the customer would ask it
 6. Any CONDITIONAL inclusion — must have its own dedicated FAQ
 7. (Optional) One "insider tip" question that adds genuine value
+
+FAQ answers must be **minimum 40 words**. Short answers get ignored by Google's AI Overviews. Add context, reassurance, or practical detail to reach the threshold — don't pad with filler.
 
 FAQ question phrasing — write it as a real person would ask, not formal:
 - ✓ "Do I need to print my ticket or is my phone fine?"
@@ -299,9 +315,9 @@ Mix: 2-3 head terms + 3-4 mid-tail + 2-3 long-tail. All lowercase. No spaces in 
 | Title length | ≤ 80 chars |
 | Title starts with a strong word | Not "Get", "Buy", "Book", "The", "A" |
 | Short description | Does not start with attraction name |
-| Highlights | Exactly 6, each 10-15 words, no two starting with same word |
+| Highlights | Exactly 6, each 2-8 words, no two starting with same word |
 | Description sections | All 4 present, headers are teasers not labels |
-| FAQs | ≥ 6 present; CONDITIONAL inclusions have a dedicated FAQ |
+| FAQs | ≥ 7 present; CONDITIONAL inclusions have a dedicated FAQ |
 | SEO title | ≤ 60 chars |
 | SEO meta | ≤ 155 chars |
 | Tags | 8-12 tags present |
@@ -314,8 +330,8 @@ Mix: 2-3 head terms + 3-4 mid-tail + 2-3 long-tail. All lowercase. No spaces in 
 
 Copy quality score is `review` (not `pass`) if:
 - Any section uses a banned opener
-- Any highlight is under 8 words or over 18 words
-- Any FAQ answer is under 20 words
+- Any highlight is under 2 words or over 8 words
+- Any FAQ answer is under 40 words
 - Any variant description uses "this option includes"
 
 ---
@@ -354,8 +370,8 @@ Return an error object (not a listing) if:
 ```
 
 Stop conditions:
-- The structured data from the intake agent has `publish_blocked: true` AND the blocked field is `adult_price` — you cannot write variant descriptions without knowing the pricing tier
-- The experience type is not one of TOUR / ATTRACTION / EVENT — classification must be resolved first
+- The structured data from the intake agent has `publish_blocked: true` AND `variants[0].pricing` has no ADULT entry — you cannot write variant descriptions without knowing the pricing tier
+- The `tourType` is not one of `GUIDED_TOUR`, `SHOW_OR_EVENT`, `ATTRACTION_TICKET`, `DESERT_SAFARI`, `COMBO_TICKET` — classification must be resolved first
 - Fewer than 3 activities or features are present in the intake data — not enough source material to write honest, specific copy
 
 Do NOT stop for: missing images, missing guide language, CONDITIONAL inclusions, or DEFERRED fields. These are handled in copy with appropriate hedging language and flagged in `publish_verdict.warnings[]`.

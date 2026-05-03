@@ -74,19 +74,19 @@ Run every check below. Flag anything that fails.
 
 ### 1.1 Duration
 
-Find `duration_ms` in intake. Convert to hours (divide by 3,600,000).
+Find `duration` (milliseconds) in intake. Convert to hours (divide by 3,600,000). Also check `durationText` for the human-readable value.
 
 Scan the generated description, highlights, and FAQs for any duration mention ("6-hour", "spend 4 hours", "approximately 3 hours"). If a duration is mentioned:
 - Does it match the intake value within a reasonable rounding margin (±30 min)?
-- If intake `duration_ms` is null, is the copy correctly non-specific about duration?
+- If intake `duration` is null, is the copy correctly non-specific about duration?
 
 Flag type: `factual_mismatch`
 
 ### 1.2 Start Times
 
-Find `start_times` in intake (array of "HH:MM" strings).
+Find `startTimes` in intake (array of "HH:MM" strings).
 
-If the generated content mentions specific departure or start times, do they appear in `start_times`? Any mentioned time not in the array is a hallucination.
+If the generated content mentions specific departure or start times, do they appear in `startTimes`? Any mentioned time not in the array is a hallucination.
 
 Flag type: `hallucination`
 
@@ -105,48 +105,50 @@ Item not in intake inclusions at all: flag type `inclusion_not_in_intake`
 
 ### 1.4 Hotel Pickup
 
-Find `has_hotel_pickup` in intake.
+Find `hasHotelPickup` in intake.
 
-If `has_hotel_pickup: false` and the generated content promises hotel pickup — that is a hallucination. Flag it.
-If `has_hotel_pickup: true`, verify the logistics section mentions pickup correctly.
+If `hasHotelPickup: false` and the generated content promises hotel pickup — that is a hallucination. Flag it.
+If `hasHotelPickup: true`, verify the logistics section mentions pickup correctly.
 
 Flag type: `hallucination`
 
 ### 1.5 Cancellation Policy
 
-Find `has_free_cancellation` and `cutoff_hours` in intake.
+Find `cancellationPolicy` in intake. Check `cancellationPolicy.type` (`REFUND_BEFORE_CUTOFF`, `NON_REFUNDABLE`, or `PARTIAL_REFUND`), `cancellationPolicy.refundPercentage` (0–100), and `cancellationPolicy.cutoffHours`.
 
 Check the generated FAQ answer for the cancellation question:
-- If `has_free_cancellation: false`, the copy must not promise free cancellation.
-- If `has_free_cancellation: true`, the cutoff hours mentioned must match `cutoff_hours`.
+- If `cancellationPolicy.type` is `NON_REFUNDABLE` or `refundPercentage` is 0, the copy must not promise free cancellation.
+- If `cancellationPolicy.type` is `REFUND_BEFORE_CUTOFF`, the cutoff hours mentioned must match `cancellationPolicy.cutoffHours`.
 
 Flag type: `factual_mismatch`
 
 ### 1.6 Pricing Tier
 
-Find `adult_price` in intake. If it is `null` or `status: "blocked"`:
+Find `variants[0].pricing[]` in intake. Look for the `ADULT` ageGroup entry and its `pricePerUnit`.
+
+If no ADULT pricing entry exists or pricePerUnit is null:
 - The generated variant descriptions must not state a specific price.
 - The SEO metadata must not include pricing claims.
 
-If `adult_price` is present, the generated content may reference the pricing tier but must not invent a different price.
+If ADULT pricing is present, the generated content may reference the pricing tier but must not invent a different price. If `INFANT` entry has `pricePerUnit: 0`, free infant entry may be called out in copy.
 
 Flag type: `hallucination`
 
 ### 1.7 Experience Type and Inventory Type
 
-Find `experience_type` and `inventory_type` in intake.
+Find `tourType` and `inventoryType` in intake.
 
-If `inventory_type` is `FLEXIBLE_START_*`: the copy must not state fixed departure times.
-If `inventory_type` is `FIXED_START_*`: the copy should reference the scheduling nature.
-If `experience_type` is `ATTRACTION`: the copy must not describe a live guide unless one is in the inclusions.
+If `inventoryType` is `FLEXIBLE_START_*`: the copy must not state fixed departure times.
+If `inventoryType` is `FIXED_START_*`: the copy should reference the scheduling nature.
+If `tourType` is `ATTRACTION_TICKET`: the copy must not describe a live guide unless one is in the inclusions.
 
 Flag type: `factual_mismatch`
 
 ### 1.8 Capacity
 
-Find `max_pax` in intake.
+Find `maxGroupSize` in intake.
 
-If the generated content states a group size or capacity figure, it must match `max_pax`. Any invented capacity number is a hallucination.
+If the generated content states a group size or capacity figure, it must match `maxGroupSize`. Any invented capacity number is a hallucination.
 
 Flag type: `hallucination`
 
@@ -215,7 +217,7 @@ Flag type: `voice_violation`
 
 Check `listing.highlights[]`:
 - Must be exactly 6 items
-- Each must be 10–15 words
+- Each must be 2–8 words
 - No two items may start with the same word
 - Each item must contain at least one specific fact (number, named feature, or concrete detail) — not vague claims
 
@@ -297,7 +299,7 @@ Flag type: `seo_violation`
 ### 3.6 FAQ Count
 
 Check `listing.faqs[]`:
-- Minimum 6 FAQs required
+- Minimum 7 FAQs required
 - If any intake field was flagged `conditional`, there must be a FAQ specifically addressing what happens when that inclusion is unavailable (refund? alternative?)
 
 Flag type: `seo_violation`
@@ -329,7 +331,7 @@ Flag type: `schema_error`
 Set `escalate_to_human: true` when ANY of the following apply:
 
 1. **Repeated hallucinations**: 3+ blocker-level hallucinations found (the model is fabricating facts, not making minor errors)
-2. **Pricing hallucination**: a specific price is stated when `adult_price` is blocked in intake
+2. **Pricing hallucination**: a specific price is stated when `variants[0].pricing` has no ADULT entry or pricePerUnit is null
 3. **Conditional with no remedy**: a CONDITIONAL inclusion appears in the inclusions list without a hedge AND there is no FAQ addressing what happens when it's unavailable — and the content generator could not have inferred a remedy from the intake data
 4. **This is the second review pass** (regeneration was attempted once and still fails): always escalate
 

@@ -20,7 +20,7 @@ CREATE TABLE runs (
     'generation_in_progress',
     'generation_complete',
     'review_in_progress',
-    'ready_for_approval',
+    'ready_for_publish',
     'regeneration_in_progress',
     'escalated_to_human',
     'approved',

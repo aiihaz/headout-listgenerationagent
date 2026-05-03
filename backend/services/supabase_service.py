@@ -40,7 +40,7 @@ async def supabase_write_with_retry(
                     q = q.eq(k, v)
                 q.execute()
             elif operation == "upsert":
-                client.table(table).upsert(data).execute()
+                client.table(table).upsert(data, on_conflict="run_id,type").execute()
             return True
         except Exception as exc:
             if attempt == attempts - 1:

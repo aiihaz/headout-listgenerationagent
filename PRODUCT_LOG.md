@@ -1,8 +1,8 @@
 # Headout AI Listing Generation Pipeline — Product Log
 
 > **Working directory**: `/Users/ihaz/Projects/list generation agent/`
-> **Last updated**: 2026-05-02 (Session 6)
-> **Status**: CLI pipeline complete. Frontend complete (all 6 screens, verified in browser). **Phase 1 backend skeleton complete** — FastAPI running, all endpoints responding, 4 CLI tests passing. Phase 2 (pipeline integration) is next.
+> **Last updated**: 2026-05-03 (Session 8)
+> **Status**: CLI pipeline complete. Frontend complete (all 6 screens, verified in browser). **Phase 2 pipeline integration complete** — orchestrator wired into FastAPI background tasks, `/regenerate` and `/images` endpoints live, 7 tests passing. Supabase auth bypass fixed, template engine schema fully aligned to camelCase intake payload, all three agent prompts grounded in actual Headout API JSON examples. Phase 3 (connect frontend to real API) is next.
 > **Repo**: https://github.com/aiihaz/headout-listgenerationagent (default branch: `staging`)
 
 ---
@@ -138,6 +138,32 @@ Design source: `experience-onboarding-agent/` bundle (Headout design system — 
 - Halyard fonts loaded from `public/fonts/` (bundled from the design export). No Google Fonts CDN dependency.
 - `FieldComponent` is the single most-used component; it owns all field states (editing, regenerating, resolved, source-open, confirm-regen) locally — no global state needed.
 
+### Backend — FastAPI (Phase 2)
+
+Located at `backend/`. Run with `uvicorn backend.main:app --reload`. Requires no Supabase config to start — filesystem fallback is active by default.
+
+| File | Role | Status |
+|---|---|---|
+| `backend/services/pipeline_service.py` | ThreadPoolExecutor bridge: `launch_pipeline` and `launch_regeneration` run sync orchestrator in a thread; thread-safe `Queue` drains status updates to Supabase without blocking the event loop. `save_image` persists uploads to Supabase Storage or filesystem. | Done — 2026-05-03 |
+| `backend/tests/__init__.py` | Package marker | Done |
+| `backend/tests/test_pipeline_service.py` | 3 backend invariant tests (no Supabase, no Gemini required) — all passing | Done — 2026-05-03 |
+
+**Changes to existing files:**
+- `backend/routers/runs.py` — `POST /api/v1/runs` now fires `launch_pipeline` as a `BackgroundTask`; added `POST /runs/:id/regenerate` (targeted section regen) and `POST /runs/:id/images` (file upload)
+- `orchestrator.py` — accepts optional `run_id` and `status_callback` params; Content Generator + Template Engine now run in parallel via `ThreadPoolExecutor`; `_notify()` helper calls callback at every state transition
+
+**Sync/async bridge pattern:**
+```
+FastAPI (async) → BackgroundTask → launch_pipeline (async)
+  └── loop.run_in_executor(ThreadPoolExecutor) → _sync_pipeline (sync thread)
+        └── orchestrator.run(..., status_callback=on_status)
+              └── on_status() → status_q.put((state, error))   [thread-safe Queue]
+  └── _drain_status() (async coroutine, event loop)
+        └── loop.run_in_executor(None, status_q.get) → update_run_status()
+```
+
+**Test results:** `7 passed in 2.17s` — no Supabase or Gemini API key required.
+
 ### Backend — FastAPI (Phase 1)
 
 Located at `backend/`. Run with `uvicorn backend.main:app --reload`. Requires no Supabase config to start — filesystem fallback is active by default.
@@ -207,7 +233,7 @@ Located at `backend/`. Run with `uvicorn backend.main:app --reload`. Requires no
   Input: intake.json
   Output: listing.json
     ├── listing: title (primary + A/B), tagline, description (short + full 4 sections),
-    │           highlights (6), inclusions, exclusions, FAQs (6-8), SEO (title/meta/tags)
+    │           highlights (6), inclusions, exclusions, FAQs (7-8), SEO (title/meta/tags)
     ├── variants: [{name, name_ab_variant, tagline, description, key_differentiators, upsell_hook}]
     ├── ab_test_plan: {priority_test, hypothesis, metric_to_watch}
     └── publish_verdict: {ready, confidence, blockers, warnings, copy_quality_score}
@@ -218,9 +244,10 @@ Located at `backend/`. Run with `uvicorn backend.main:app --reload`. Requires no
     └── @graph: [TourActivity, FAQPage, BreadcrumbList]
   Rules:
     • null fields are OMITTED — never placeholdered
-    • duration_ms → ISO 8601 (PT#H#M)
-    • start_times[] → openingHoursSpecification
+    • duration (ms) → ISO 8601 (PT#H#M)
+    • startTimes[] → openingHoursSpecification
     • faqs[] → FAQPage.mainEntity
+    • FAQPage rebuilt from listing FAQs after merge (keeps JSON-LD in sync with generated copy)
          │
          ▼
 [Orchestrator: merge]
@@ -350,7 +377,7 @@ Baked into `agent_prompt_content_generator.md` and `agent_prompt_review.md`. Qui
 3. **Specific numbers over vague superlatives** — "452 meters" not "amazing heights"
 4. **Problem → solution framing** — "Save your time by bypassing the notorious queue" not "Skip-the-line access included"
 5. **Section headers tease content, never label** — "Reach the top in under a minute" not "About this experience"
-6. **Exactly 6 highlights, each 10–15 words** — each starts with a different verb, contains one concrete fact
+6. **Exactly 6 highlights, each 2–8 words** — each starts with a different verb, contains one concrete fact
 7. **Banned openers** — "Embark on", "Welcome to", "Discover the magic of", "Experience the wonder of"
 8. **No variant named "Option", "Package", "Plan", "Tier"** — name what the customer gets
 9. **No "this option includes" in variant descriptions**
@@ -383,18 +410,15 @@ The CLI pipeline runs end-to-end. The web layer architecture is decided. Build o
 
 All 8 components built, all 4 CLI tests passing, uvicorn smoke-tested locally. See "Backend — FastAPI (Phase 1)" in the File Inventory above for full detail.
 
-### Phase 2 — Pipeline integration (2–3 days)
+### Phase 2 — Pipeline integration ✅ COMPLETE (Session 7)
+
+All components built, 7 tests passing. See "Backend — FastAPI (Phase 2)" in the File Inventory above for full detail.
+
+**Remaining (deferred to Phase 4):**
 
 | Component | Notes |
 |---|---|
-| `backend/services/pipeline_service.py` | ThreadPoolExecutor bridge (sync orchestrator → async FastAPI). Status queue → Supabase Realtime |
-| Wire POST /runs to background task | Gemini timeout + all exceptions → `generation_blocked` state |
-| POST /runs/:id/regenerate | Targeted section regen endpoint |
-| POST /runs/:id/images | Image upload (proxied through FastAPI for MVP) |
-| Escalation persistence | On second Review Agent fail: write to `run_artifacts` table (type: escalation_record) |
-| Content Generator parallelisation | `concurrent.futures.ThreadPoolExecutor` for Generator + Template Engine in `orchestrator.py` |
-| `backend/tests/test_pipeline_service.py` | Gemini timeout, Supabase write retry, escalation persistence |
-| `backend/tests/test_auth.py` | JWT validation, RLS cross-user isolation |
+| `backend/tests/test_auth.py` | JWT validation, RLS cross-user isolation — Phase 4 with auth wiring |
 
 ### Phase 3 — Frontend ✅ COMPLETE (Session 4)
 
@@ -461,6 +485,75 @@ All 6 screens built, verified in browser, production build passing. See "Fronten
 ---
 
 ## Session History
+
+### Session 8 — Schema Alignment + Prompt Consistency Audit (2026-05-03)
+
+Grounded all agent prompts in the actual Headout API JSON examples (`api_json_examples.md`), fixed Supabase auth bypass, aligned template engine to the camelCase intake schema, and completed a full cross-layer consistency audit.
+
+**Auth fix:**
+- `backend/dependencies.py` — dev bypass now returns `{"id": None, "email": "dev@local"}` (NULL, not a fake UUID) to avoid FK violation on `runs.created_by → auth.users(id)`
+- `backend/routers/runs.py` — `created_by` only included in the insert row if `user["id"]` is not None
+
+**Model fix:**
+- `models/intake.py` — added `INFERRED` to `AmbiguityType` enum (Gemini legitimately returns it for implied fields)
+
+**Template engine fixes (`agents/template_engine.py`):**
+- `_build_offers()` fully rewritten to read `variants[*].pricing[{ageGroup, pricePerUnit, currencyCode}]` array; falls back to old cents-based fields only if the new structure is absent
+- `_build_tour_activity()` — removed stale `tour_name` fallback; fixed `start_times` → `startTimes`; removed `max_pax` fallback; reads `durationText` first, converts `duration` ms only as fallback
+- Added `_city_name()` helper supporting both flat string and `{code, name}` object
+- `_build_location()` reads `coordinates.latitude/longitude` nested object
+- `_build_breadcrumb()` uses `_city_name()` helper
+- Cancellation reads `refundPercentage` and both `cutoffHours`/`refundBeforeHours`
+
+**Orchestrator fix (`orchestrator.py` `_merge()`):**
+- FAQPage in JSON-LD is now rebuilt from listing FAQs after merge (not from intake FAQs), keeping JSON-LD in sync with generated copy and eliminating FAQ count mismatch (blocker B007)
+
+**Supabase service fix:**
+- `backend/services/supabase_service.py` — artifact upsert conflict target corrected to `on_conflict="run_id,type"` (was defaulting to PK, causing duplicate rows)
+- Artifact type key renamed from `'escalation'` to `'escalation_record'` to match DB CHECK constraint
+
+**Prompt standards — grounded in `api_json_examples.md`:**
+- Highlights: corrected from 10–15 words → **2–8 words** (real Headout API examples show 2–6 words)
+- FAQ minimum: corrected from 6 → **7** across all three agent prompts
+- `tourType` codes aligned to Headout API: `GUIDED_TOUR`, `SHOW_OR_EVENT`, `ATTRACTION_TICKET`, `DESERT_SAFARI`, `COMBO_TICKET`
+- `agent_prompt_supplier_intake.md` — full explicit payload schema added; `city {code, name}` object, `durationText`, `variants[*].pricing[]` array, `cancellationPolicy.refundPercentage`, `inputFields[]`, `media[]`, `weatherDependent`, `openingHours`; `pricePerUnit` in dollars (not cents); 10 new self-check assertions
+
+**Consistency audit — field name fixes:**
+
+`agent_prompt_review.md` — all field references updated to match camelCase intake schema:
+- `duration_ms` → `duration` (+ added reference to `durationText`)
+- `start_times` → `startTimes`
+- `has_hotel_pickup` → `hasHotelPickup`
+- `has_free_cancellation`/`cutoff_hours` → `cancellationPolicy.type`/`refundPercentage`/`cutoffHours`
+- `max_pax` → `maxGroupSize`
+
+`agents/template_engine.py` — stale field name fallbacks removed:
+- `p.get("tour_name")` fallback removed
+- `p.get("start_times")` → `p.get("startTimes")`
+- `p.get("max_pax")` fallback removed
+
+`agent_prompt_content_generator.md` — added "Reading the Intake Payload" section explaining the new field structure; stop conditions updated from `adult_price` to `variants[0].pricing` ADULT check.
+
+---
+
+### Session 7 — Phase 2 Pipeline Integration (2026-05-03)
+
+Wired the synchronous orchestrator into FastAPI's async background task system, added targeted regen and image upload endpoints, parallelised the Content Generator + Template Engine, and added 3 backend invariant tests.
+
+**Files created:**
+- `backend/services/pipeline_service.py` — ThreadPoolExecutor bridge: `launch_pipeline`, `launch_regeneration`, `save_image`
+- `backend/tests/__init__.py` — package marker
+- `backend/tests/test_pipeline_service.py` — 3 backend invariant tests (orchestrator exception → `generation_blocked`, Supabase write retry × 3, escalation_record.json written on double review fail)
+
+**Files modified:**
+- `orchestrator.py` — added `run_id` + `status_callback` params; `_notify()` helper; Content Generator + Template Engine now parallel via `ThreadPoolExecutor(max_workers=2)`
+- `backend/routers/runs.py` — `POST /runs` fires `launch_pipeline` as `BackgroundTask`; added `POST /runs/:id/regenerate` and `POST /runs/:id/images`
+
+**Test results:** `7 passed in 2.17s`
+
+**Sync/async constraint respected:** orchestrator is sync; no async callbacks injected into threads. Queue-based pattern per `cto_instructions.md` Section 4.
+
+---
 
 ### Session 6 — Phase 1 Backend Skeleton (2026-05-02)
 

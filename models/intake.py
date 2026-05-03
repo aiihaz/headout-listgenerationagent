@@ -14,6 +14,7 @@ class AmbiguityType(str, Enum):
     ABSENT = "ABSENT"
     DEFERRED = "DEFERRED"
     CONDITIONAL = "CONDITIONAL"
+    INFERRED = "INFERRED"
 
 
 class MetaConfidence(str, Enum):

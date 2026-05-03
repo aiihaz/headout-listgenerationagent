@@ -9,11 +9,12 @@ Artifacts saved per run to listings/{run_id}/:
 
 import json
 import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from google import genai
 
@@ -74,24 +75,39 @@ class PipelineResult:
     error: Optional[str]
 
 
-def run(supplier_text: str, client: genai.Client) -> PipelineResult:
-    run_id = str(uuid.uuid4())[:8]
+StatusCallback = Callable[[str, Optional[str]], None]
+
+
+def _notify(state: PipelineState, callback: Optional[StatusCallback], error: Optional[str] = None) -> None:
+    if callback:
+        callback(state.value, error)
+
+
+def run(
+    supplier_text: str,
+    client: genai.Client,
+    run_id: Optional[str] = None,
+    status_callback: Optional[StatusCallback] = None,
+) -> PipelineResult:
+    if run_id is None:
+        run_id = str(uuid.uuid4())[:8]
     ctx = PipelineRun(run_id=run_id)
     run_dir = LISTINGS_DIR / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    # Step 1 — duplicate detection (pre-intake, on raw text heuristic)
-    # We run a lightweight check; full check happens post-intake when we have the payload.
     ctx.state = PipelineState.INTAKE_IN_PROGRESS
+    _notify(ctx.state, status_callback)
 
     # Step 2 — Intake Agent
     try:
         ctx.intake = intake_agent.run(supplier_text, client)
         ctx.state = PipelineState.INTAKE_COMPLETE
+        _notify(ctx.state, status_callback)
         _save(run_dir / "intake.json", ctx.intake.model_dump(by_alias=True))
     except Exception as exc:
         ctx.state = PipelineState.INTAKE_FAILED
         ctx.error = str(exc)
+        _notify(ctx.state, status_callback, ctx.error)
         return _result(ctx)
 
     # Duplicate check on structured payload
@@ -102,19 +118,25 @@ def run(supplier_text: str, client: genai.Client) -> PipelineResult:
         ctx.intake.meta.supplier, ctx.intake.ambiguity_flags
     )
 
-    # Step 3 — Content Generator + Template Engine (sequential for demo simplicity)
+    # Step 3 — Content Generator + Template Engine in parallel
     ctx.state = PipelineState.GENERATION_IN_PROGRESS
+    _notify(ctx.state, status_callback)
     try:
-        listing_raw = content_generator.run(ctx.intake, client)
-        json_ld = template_engine.run(ctx.intake)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            gen_future = pool.submit(content_generator.run, ctx.intake, client)
+            te_future = pool.submit(template_engine.run, ctx.intake)
+            listing_raw = gen_future.result()
+            json_ld = te_future.result()
         ctx.json_ld = json_ld
         ctx.listing = listing_raw
         ctx.state = PipelineState.GENERATION_COMPLETE
+        _notify(ctx.state, status_callback)
         _save(run_dir / "listing.json", listing_raw.model_dump())
         _save(run_dir / "verified_json_ld.json", json_ld)
     except RuntimeError as exc:
         ctx.state = PipelineState.GENERATION_BLOCKED
         ctx.error = str(exc)
+        _notify(ctx.state, status_callback, ctx.error)
         return _result(ctx)
 
     # Merge: inject JSON-LD into listing structured_data + build canonical strategy
@@ -123,11 +145,13 @@ def run(supplier_text: str, client: genai.Client) -> PipelineResult:
 
     # Step 4 — Review Agent (first pass)
     ctx.state = PipelineState.REVIEW_IN_PROGRESS
+    _notify(ctx.state, status_callback)
     try:
         ctx.review = review_agent.run(ctx.intake, ctx.merged_listing, client, is_regen_pass=False)
         _save(run_dir / "review.json", ctx.review.model_dump())
     except Exception as exc:
         ctx.error = str(exc)
+        _notify(PipelineState.GENERATION_BLOCKED, status_callback, ctx.error)
         return _result(ctx)
 
     verdict = ctx.review.review.overall
@@ -135,16 +159,19 @@ def run(supplier_text: str, client: genai.Client) -> PipelineResult:
     if verdict in ("pass", "conditional_pass"):
         ctx.state = PipelineState.READY_FOR_PUBLISH
         ctx.finished_at = datetime.now(timezone.utc).isoformat()
+        _notify(ctx.state, status_callback)
         _save_final(run_dir, ctx)
         return _result(ctx)
 
     # FAIL path — targeted regeneration
     if ctx.review.review.escalate_to_human:
         ctx.state = PipelineState.ESCALATED_TO_HUMAN
+        _notify(ctx.state, status_callback)
         _save_escalation(run_dir, ctx)
         return _result(ctx)
 
     ctx.state = PipelineState.REGENERATION_IN_PROGRESS
+    _notify(ctx.state, status_callback)
     blockers = [b.model_dump() for b in ctx.review.review.blockers]
     scope = ctx.review.review.regeneration_scope
 
@@ -157,6 +184,7 @@ def run(supplier_text: str, client: genai.Client) -> PipelineResult:
     except Exception as exc:
         ctx.state = PipelineState.ESCALATED_TO_HUMAN
         ctx.error = str(exc)
+        _notify(ctx.state, status_callback, ctx.error)
         _save_escalation(run_dir, ctx)
         return _result(ctx)
 
@@ -167,6 +195,7 @@ def run(supplier_text: str, client: genai.Client) -> PipelineResult:
     except Exception as exc:
         ctx.state = PipelineState.ESCALATED_TO_HUMAN
         ctx.error = str(exc)
+        _notify(ctx.state, status_callback, ctx.error)
         _save_escalation(run_dir, ctx)
         return _result(ctx)
 
@@ -176,6 +205,7 @@ def run(supplier_text: str, client: genai.Client) -> PipelineResult:
         ctx.state = PipelineState.ESCALATED_TO_HUMAN
         _save_escalation(run_dir, ctx)
 
+    _notify(ctx.state, status_callback)
     ctx.finished_at = datetime.now(timezone.utc).isoformat()
     _save_final(run_dir, ctx)
     return _result(ctx)
@@ -185,7 +215,30 @@ def _merge(listing: ListingOutput, json_ld: dict) -> ListingOutput:
     data = listing.model_dump()
     if "structured_data" not in data:
         data["structured_data"] = {}
-    data["structured_data"]["json_ld"] = json_ld
+
+    # Rebuild FAQPage from listing FAQs so JSON-LD stays in sync with generated copy.
+    # Template engine runs on intake FAQs; content generator may add/change FAQs.
+    merged_json_ld = dict(json_ld) if json_ld else {}
+    listing_faqs = (data.get("listing") or {}).get("faqs") or []
+    if listing_faqs:
+        faq_entities = [
+            {
+                "@type": "Question",
+                "name": f.get("question") or f.get("q", ""),
+                "acceptedAnswer": {"@type": "Answer", "text": f.get("answer") or f.get("a", "")},
+            }
+            for f in listing_faqs
+            if (f.get("question") or f.get("q")) and (f.get("answer") or f.get("a"))
+        ]
+        graph = merged_json_ld.get("@graph") or []
+        # Replace existing FAQPage node; insert one if absent.
+        new_graph = [n for n in graph if n.get("@type") != "FAQPage"]
+        if faq_entities:
+            new_graph.append({"@type": "FAQPage", "mainEntity": faq_entities})
+        merged_json_ld["@graph"] = new_graph
+
+    data["structured_data"]["json_ld"] = merged_json_ld
+
     # Build canonical strategy from variants
     variants = data.get("variants") or []
     canonicals = []

@@ -23,14 +23,19 @@ If any answer is unclear after reading, apply the ambiguity rules in Section 3 b
 ## 2. Classify — Exact Decision Rules
 
 ### `tourType`
+Use the exact Headout API category codes:
 ```
 Has a live guide OR structured itinerary OR transport-as-activity?
-  YES → "TOUR"
+  YES → Is it a desert safari specifically?
+          YES → "DESERT_SAFARI"
+          NO  → "GUIDED_TOUR"
   NO  → Is there a fixed showtime with a defined end (concert, theater, sports)?
-          YES → "EVENT"
-          NO  → "ATTRACTION"
+          YES → "SHOW_OR_EVENT"
+          NO  → Does it bundle 2+ independently bookable products?
+                  YES → "COMBO_TICKET"
+                  NO  → "ATTRACTION_TICKET"
 ```
-Only three values exist. Desert safaris, helicopter tours, canal cruises, guided walks = TOUR even when they feel like attractions.
+Valid values: `GUIDED_TOUR`, `SHOW_OR_EVENT`, `ATTRACTION_TICKET`, `DESERT_SAFARI`, `COMBO_TICKET`.
 
 ### `flowType`
 ```
@@ -78,7 +83,7 @@ Plausibility check by field:
   blackoutDates + 24/7 outdoor monument             → plausible    → []
   languages     + experience has a live guide        → NOT plausible → null + flag; default ["en"]
   languages     + audio headphone system             → plausible    → keep supplier list
-  childPrice    + any experience                     → NOT plausible → null + flag always
+  variants[*].pricing[CHILD]  + any experience        → NOT plausible → null + flag always
   images        + any experience                     → NOT plausible → null + flag; blocks publish
 ```
 
@@ -212,7 +217,72 @@ Produce exactly this structure. Every field must have an annotation comment.
   },
 
   "payload": {
-    // Full product object here — no inline annotations
+    "productName": "string — max 80 chars",
+    "tourType": "GUIDED_TOUR | SHOW_OR_EVENT | ATTRACTION_TICKET | DESERT_SAFARI | COMBO_TICKET",
+    "flowType": "NORMAL | SVG | COMBO",
+    "inventoryType": "FIXED_START_FIXED_DURATION | FIXED_START_FLEXIBLE_DURATION | FLEXIBLE_START_FIXED_DURATION | FLEXIBLE_START_FLEXIBLE_DURATION",
+    "pricingType": "PER_PERSON | PER_GROUP",
+    "city": { "code": "string — lowercase slug e.g. paris", "name": "string — display name e.g. Paris" },
+    "country": "string",
+    "duration": "integer ms or null",
+    "durationText": "string — human readable e.g. '2 hours', '3 days', null if unknown",
+    "startTimes": ["HH:MM"] ,
+    "languages": ["ISO 639-1 code"],
+    "location": {
+      "name": "string or null",
+      "address": "string or null",
+      "coordinates": { "latitude": "number or null", "longitude": "number or null" }
+    },
+    "maxGroupSize": "integer or null",
+    "minGroupSize": "integer or null",
+    "hasHotelPickup": "boolean",
+    "weatherDependent": "boolean — true for outdoor/desert/water activities",
+    "openingHours": {
+      "monday": "HH:MM-HH:MM or CLOSED",
+      "tuesday": "HH:MM-HH:MM or CLOSED"
+    },
+    "blackoutDates": ["YYYY-MM-DD"] ,
+    "inclusions": ["string"],
+    "exclusions": ["string"],
+    "highlights": ["string — 2-8 words, verb-led, exactly 6 bullets matching real Headout style"],
+    "description": "string — 3-4 paragraphs",
+    "importantInformation": ["string"],
+    "faqs": [{ "question": "string", "answer": "string" }],
+    "media": [{ "url": "string", "type": "IMAGE | VIDEO", "alt": "string", "order": "integer" }],
+    "cancellationPolicy": {
+      "type": "REFUND_BEFORE_CUTOFF | NON_REFUNDABLE | PARTIAL_REFUND",
+      "refundPercentage": "integer 0-100",
+      "cutoffHours": "integer or null",
+      "description": "string — human readable policy"
+    },
+    "variants": [
+      {
+        "name": "string",
+        "description": "string",
+        "inventoryType": "string or null — override top-level if this variant differs",
+        "duration": "integer ms or null — override top-level if this variant differs",
+        "pricing": [
+          {
+            "ageGroup": "ADULT | CHILD | YOUTH | INFANT | SENIOR",
+            "minAge": "integer or null",
+            "maxAge": "integer or null",
+            "pricePerUnit": "number — dollars/euros, NOT cents e.g. 89.00",
+            "currencyCode": "ISO 4217 e.g. USD"
+          }
+        ]
+      }
+    ],
+    "inputFields": [
+      {
+        "name": "string — camelCase field name",
+        "type": "text | email | phone | date | boolean | enum",
+        "scope": "PRIMARY_CUSTOMER | ALL_CUSTOMERS | VARIANT",
+        "required": "boolean",
+        "label": "string — shown to customer",
+        "options": ["string — for enum type only"],
+        "conditional": "string — e.g. 'hotelPickup == true', omit if always shown"
+      }
+    ]
   },
 
   "_sources": {
@@ -270,7 +340,7 @@ Generate copy only from what the supplier provided. Do not invent activities, vi
 
 **Inclusions:** List only explicit or strongly implied items. Implied items must be recorded in `_sources` (e.g. `"inclusions.N": "INFERRED"`) so the Review Agent can verify them. Do not add inline comments to JSON values.
 
-**FAQs:** Minimum 6. Always include: logistics (pickup/location), timing, cancellation policy, child suitability. Every CONDITIONAL inclusion gets its own FAQ. Every DEFERRED field gets a FAQ directing customers to contact the operator before visiting.
+**FAQs:** Minimum 7. Always include: logistics (pickup/location), timing, cancellation policy, child suitability. Every CONDITIONAL inclusion gets its own FAQ. Every DEFERRED field gets a FAQ directing customers to contact the operator before visiting.
 
 ---
 
@@ -290,13 +360,22 @@ Do not stop for missing images, missing child pricing, or missing guide language
 ## 7. Self-Check Before Output
 
 ```
-□ tourType is one of: ATTRACTION, TOUR, EVENT
+□ tourType is one of: GUIDED_TOUR, SHOW_OR_EVENT, ATTRACTION_TICKET, DESERT_SAFARI, COMBO_TICKET
 □ flowType is one of: NORMAL, SVG, COMBO
 □ inventoryType is one of the four valid values
 □ duration is in milliseconds or null — never hours or minutes
+□ durationText is a human-readable string e.g. "2 hours" or null
 □ startTimes are in 24-hour "HH:MM" format
+□ city is an object {code, name} — not a flat string
+□ variants[*].pricing[] is an array of {ageGroup, pricePerUnit (dollars), currencyCode} — never a flat price field
+□ pricePerUnit is in dollars/euros — NOT cents (89.00 not 8900)
+□ cancellationPolicy has refundPercentage (0-100) and description
+□ inputFields[] is present and includes at minimum firstName, lastName, email for PER_PERSON experiences
+□ weatherDependent is set for all outdoor/desert/water activities
+□ openingHours is set for ATTRACTION_TICKET experiences, null otherwise
+□ highlights[] has exactly 6 items, each 2-8 words
 □ Every PER_GROUP variant has groupSize set
-□ hasHotelPickup: true → Custom userField for hotel name/room exists
+□ hasHotelPickup: true → inputFields includes hotelName field
 □ [] is never used for an UNKNOWN field — only for confirmed-empty fields
 □ Every CONDITIONAL inclusion has a FAQ entry
 □ Every DEFERRED field has an importantInformation[] entry
