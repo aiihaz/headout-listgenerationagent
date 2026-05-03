@@ -107,7 +107,7 @@ A single JSON object matching this exact schema. Every field is required unless 
       }
     },
     "highlights": [
-      "string — exactly 6 bullets, 2-8 words each. Lead with verb or specific fact. No bullet starting with same word."
+      "string — 3-5 items, each 1-2 complete sentences, 15-35 words. Each covers a distinct aspect of the experience. Active voice, specific details."
     ],
     "inclusions": [
       "string — each item is a plain noun phrase. No 'if option selected' language — only list what's in THIS variant."
@@ -223,27 +223,30 @@ Rules:
 - Must contain: top sensory hook OR key practical benefit, and what's included at a high level
 - Never starts with the attraction name
 
-### Highlights (exactly 6)
+### Highlights (3–5 items)
 
 Each highlight must:
-- Be 2-8 words
-- Start with a different verb or specific fact from the others
-- Contain one concrete detail (a number, a specific feature name, a comparison)
+- Be 1-2 complete sentences, 15-35 words
+- Cover a distinct aspect: access/entry, what's included, specific attractions, flexibility, upgrade options
+- Name specific things — attraction names, ride names, artworks, zones, numbers
+- Read like a confident marketing sentence, not a bullet fragment
 - Not duplicate information from another highlight
 
 ```
 Good:
-  "Skip the ticket queue and walk straight in with your fast-track voucher"
-  "Climb the Nativity or Passion Facade towers via private lift"
-  "360° views of Barcelona from 172 metres above street level"
-  "Multilingual audio guide included — choose your language on arrival"
-  "One of the world's most unique buildings, still under construction after 140 years"
-  "Non-refundable tickets — book when you're certain, secure the best price"
+  "Get direct entry within the reserved time slot to the world's largest and most visited museum, the Louvre, as you access the museum's permanent collection, including the Mona Lisa, Venus de Milo, and Winged Victory."
+  "With these all-day valid tickets, explore the vast collection of artworks at your own pace."
+  "Upgrade your ticket to cruise through the waters of the Seine River, or explore with an audio guide available in 9 languages for better understanding of the history and artworks."
+
+  "Enjoy a full day at Thorpe Park Resort, a thrill-based theme park with over 25 extreme rides like Hyperia and SAW – The Ride."
+  "Ride Hyperia, the UK's tallest coaster, speed from 0–80 mph on Stealth, or plunge into darkness on the horror-themed SAW – The Ride."
+  "Upgrade your tickets and get 2-day entry to the theme park, 10% off at the gift shops, and other benefits."
 
 Bad:
-  "Amazing experience at a world-class attraction"  ← vague
-  "See incredible views"  ← weak verb, no specifics
+  "Skip the queue"  ← too short, fragment
+  "Amazing views of the city"  ← vague, no specifics
   "Great for all ages"  ← generic tourism copy
+  "See incredible artworks"  ← no named attractions
 ```
 
 ### Full Description — Section Structure
@@ -315,7 +318,7 @@ Mix: 2-3 head terms + 3-4 mid-tail + 2-3 long-tail. All lowercase. No spaces in 
 | Title length | ≤ 80 chars |
 | Title starts with a strong word | Not "Get", "Buy", "Book", "The", "A" |
 | Short description | Does not start with attraction name |
-| Highlights | Exactly 6, each 2-8 words, no two starting with same word |
+| Highlights | 3-5 items, each 15-35 words, each covering a distinct aspect |
 | Description sections | All 4 present, headers are teasers not labels |
 | FAQs | ≥ 7 present; CONDITIONAL inclusions have a dedicated FAQ |
 | SEO title | ≤ 60 chars |
@@ -330,7 +333,7 @@ Mix: 2-3 head terms + 3-4 mid-tail + 2-3 long-tail. All lowercase. No spaces in 
 
 Copy quality score is `review` (not `pass`) if:
 - Any section uses a banned opener
-- Any highlight is under 2 words or over 8 words
+- Any highlight is under 10 words or over 40 words
 - Any FAQ answer is under 40 words
 - Any variant description uses "this option includes"
 

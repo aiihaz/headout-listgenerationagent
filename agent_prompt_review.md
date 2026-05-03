@@ -233,10 +233,11 @@ Flag type: `voice_violation`
 ### 2.5 Highlights Structure
 
 Check `listing.highlights[]`:
-- Must be exactly 6 items
-- Each must be 2–8 words
-- No two items may start with the same word
-- Each item must contain at least one specific fact (number, named feature, or concrete detail) — not vague claims
+- Must be 3–5 items
+- Each must be 15–35 words (1-2 complete sentences)
+- Each must name at least one specific thing: an attraction, artwork, ride, zone, number, or named feature
+- No vague claims ("amazing", "great for all ages", "incredible views") without specifics
+- Each must cover a distinct aspect — no two highlights should say the same thing
 
 Flag each failing highlight individually with its index.
 
