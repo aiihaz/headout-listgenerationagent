@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Search, Plus, Inbox, RefreshCw } from 'lucide-react';
 import { api } from '../lib/api';
 import type { ListingRow, ApiRun } from '../types';
@@ -56,12 +57,8 @@ function rowPillStyle(l: ListingRow): { background: string; color: string } {
   return { background: 'var(--ink10)', color: 'var(--ink60)' };
 }
 
-interface DashboardProps {
-  onNew: () => void;
-  onOpen: (runId: string) => void;
-}
-
-export function Dashboard({ onNew, onOpen }: DashboardProps) {
+export function Dashboard() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('All');
   const [listings, setListings] = useState<ListingRow[]>(() => {
@@ -123,7 +120,7 @@ export function Dashboard({ onNew, onOpen }: DashboardProps) {
             }}
           />
         </div>
-        <button onClick={onNew} style={{
+        <button onClick={() => navigate('/new')} style={{
           height: 36, padding: '0 16px', background: 'var(--purps)', color: '#fff',
           border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600,
           display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
@@ -196,7 +193,7 @@ export function Dashboard({ onNew, onOpen }: DashboardProps) {
                 return (
                   <tr
                     key={l.id}
-                    onClick={() => onOpen(l.runId)}
+                    onClick={() => navigate(`/runs/${l.runId}/review`)}
                     style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--border)' : 'none', cursor: 'pointer', transition: 'background 120ms' }}
                     onMouseEnter={e => (e.currentTarget.style.background = '#FAFAFA')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}

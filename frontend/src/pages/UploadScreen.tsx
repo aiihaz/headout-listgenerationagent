@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { ChevronRight, Search, X, UploadCloud, ChevronDown, ChevronUp, Check, Zap } from 'lucide-react';
 import { api } from '../lib/api';
-import type { ProcessData } from '../types';
+import { useNavigate } from 'react-router-dom';
 
 interface UploadedFile {
   name: string;
@@ -31,12 +31,8 @@ function formatSize(b: number) {
   return b > 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${(b / 1024).toFixed(0)} KB`;
 }
 
-interface UploadScreenProps {
-  onProcess: (d: ProcessData) => void;
-  onBack: () => void;
-}
-
-export function UploadScreen({ onProcess, onBack }: UploadScreenProps) {
+export function UploadScreen() {
+  const navigate = useNavigate();
   const [tab, setTab] = useState<'paste' | 'files'>('paste');
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [pastedText, setPastedText] = useState('');
@@ -117,7 +113,7 @@ export function UploadScreen({ onProcess, onBack }: UploadScreenProps) {
         }
       }
       const { run_id } = await api.createRun(supplierInput);
-      onProcess({ expName: expName || 'New listing', runId: run_id });
+      navigate(`/runs/${run_id}/processing`, { state: { expName: expName || 'New listing' } });
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Failed to start pipeline');
       setSubmitting(false);
@@ -128,7 +124,7 @@ export function UploadScreen({ onProcess, onBack }: UploadScreenProps) {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'auto' }}>
       {/* Breadcrumb */}
       <div style={{ padding: '16px 32px 0', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-        <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--purps)', cursor: 'pointer', fontWeight: 500, padding: 0, fontSize: 13 }}>
+        <button onClick={() => navigate('/dashboard')} style={{ background: 'none', border: 'none', color: 'var(--purps)', cursor: 'pointer', fontWeight: 500, padding: 0, fontSize: 13 }}>
           Listings
         </button>
         <ChevronRight size={13} color="var(--ink60)" />

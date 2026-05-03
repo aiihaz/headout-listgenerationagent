@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Check, ArrowRight, AlertTriangle } from 'lucide-react';
 import { api } from '../lib/api';
 import { TERMINAL_OK, TERMINAL_FAIL, type RunStatus } from '../types';
@@ -42,21 +43,22 @@ function statusToContextLine(status: RunStatus, error?: string | null): string {
   return map[status] ?? 'Processing…';
 }
 
-interface ProcessingScreenProps {
-  expName?: string;
-  runId?: string;
-  onDone: () => void;
-  onError: () => void;
-}
+export function ProcessingScreen() {
+  const { runId } = useParams<{ runId: string }>();
+  const navigate = useNavigate();
+  const { state } = useLocation();
+  const expName: string | undefined = (state as { expName?: string } | null)?.expName;
 
-export function ProcessingScreen({ expName, runId, onDone, onError }: ProcessingScreenProps) {
   const [stage, setStage] = useState(0);
   const [contextLine, setContextLine] = useState('Queued for processing…');
   const [failed, setFailed] = useState(false);
   const [failMessage, setFailMessage] = useState('');
-  const onDoneRef = useRef(onDone);
-  const onErrorRef = useRef(onError);
-  useEffect(() => { onDoneRef.current = onDone; onErrorRef.current = onError; }, [onDone, onError]);
+  const onDoneRef = useRef(() => navigate(`/runs/${runId}/review`));
+  const onErrorRef = useRef(() => navigate('/dashboard'));
+  useEffect(() => {
+    onDoneRef.current = () => navigate(`/runs/${runId}/review`);
+    onErrorRef.current = () => navigate('/dashboard');
+  }, [runId]);
 
   useEffect(() => {
     if (!runId) {

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Send } from 'lucide-react';
 
 const CHECKLIST = [
@@ -7,12 +8,11 @@ const CHECKLIST = [
   'I have confirmed pickup zones and meeting points with the supplier.',
 ];
 
-interface PublishConfirmProps {
-  onConfirm: () => void;
-  onEdit: () => void;
-}
-
-export function PublishConfirm({ onConfirm, onEdit }: PublishConfirmProps) {
+export function PublishConfirm() {
+  const { runId } = useParams<{ runId: string }>();
+  const navigate = useNavigate();
+  const onConfirm = () => navigate(`/runs/${runId}/published`);
+  const onEdit = () => navigate(`/runs/${runId}/review`);
   const [checks, setChecks] = useState([false, false, false]);
   const allChecked = checks.every(Boolean);
   const toggle = (i: number) => setChecks(c => c.map((v, j) => j === i ? !v : v));

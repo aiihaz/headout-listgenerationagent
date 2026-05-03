@@ -1,12 +1,3 @@
-export type Screen =
-  | 'login'
-  | 'dashboard'
-  | 'upload'
-  | 'processing'
-  | 'review'
-  | 'publish'
-  | 'published';
-
 export type FieldStatus = 'ready' | 'caveat' | 'review';
 export type ListingStatus = 'Draft' | 'Processing' | 'In Review' | 'Ready' | 'Published' | 'Failed';
 export type VerdictType = 'ready' | 'caveat' | 'review' | null;
@@ -120,11 +111,6 @@ export interface FieldData {
   caveat?: string;       // caveat message
   source: string | null; // null = agent inferred
   action?: 'regenerate' | 'associate_action';
-}
-
-export interface ProcessData {
-  expName: string;
-  runId: string;
 }
 
 export interface ReviewData {

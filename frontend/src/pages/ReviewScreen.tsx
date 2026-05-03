@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, ChevronRight, Eye, Send, AlertTriangle, CheckCircle,
   ArrowRight, X, Check, Plus, FileText, ExternalLink,
@@ -106,13 +107,6 @@ function SupplierMessageField(_: SupplierMessageFieldProps) {
   );
 }
 
-interface ReviewScreenProps {
-  onPublish: () => void;
-  onBack: () => void;
-  runId?: string;
-  showSourceQuotes?: boolean;
-}
-
 function countFlags(data: ReviewData): number {
   const allFields = [
     data.title, data.descHook, ...data.highlights, ...data.inclusions,
@@ -121,7 +115,12 @@ function countFlags(data: ReviewData): number {
   return allFields.filter(f => f.status === 'review' || f.status === 'caveat').length;
 }
 
-export function ReviewScreen({ onPublish, onBack, runId, showSourceQuotes = true }: ReviewScreenProps) {
+export function ReviewScreen() {
+  const { runId } = useParams<{ runId: string }>();
+  const navigate = useNavigate();
+  const onPublish = () => navigate(`/runs/${runId}/publish`);
+  const onBack = () => navigate('/dashboard');
+  const showSourceQuotes = true;
   const [reviewData, setReviewData] = useState<ReviewData>(
     // cast: REVIEW_DATA uses satisfies which doesn't widen to ReviewData — use mock directly
     {

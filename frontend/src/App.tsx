@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { TopNav } from './components/TopNav';
 import { Dashboard } from './pages/Dashboard';
 import { UploadScreen } from './pages/UploadScreen';
@@ -9,16 +10,42 @@ import { PublishedScreen } from './pages/PublishedScreen';
 import { LoginScreen } from './pages/LoginScreen';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { supabase } from './lib/supabase';
-import type { Screen, ProcessData } from './types';
+import { useLocation } from 'react-router-dom';
+
+function useAutoSave() {
+  const { pathname } = useLocation();
+  return pathname.includes('/review');
+}
+
+function AppShell() {
+  const autoSave = useAutoSave();
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+      <TopNav autoSave={autoSave} />
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <ErrorBoundary>
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/new" element={<UploadScreen />} />
+            <Route path="/runs/:runId/processing" element={<ProcessingScreen />} />
+            <Route path="/runs/:runId/review" element={<ReviewScreen />} />
+            <Route path="/runs/:runId/publish" element={<PublishConfirm />} />
+            <Route path="/runs/:runId/published" element={<PublishedScreen />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </ErrorBoundary>
+      </div>
+    </div>
+  );
+}
 
 export function App() {
-  const [screen, setScreen] = useState<Screen>('dashboard');
-  const [processData, setProcessData] = useState<ProcessData | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!supabase) {
-      // No Supabase configured — dev mode, skip auth
       setIsAuthenticated(true);
       return;
     }
@@ -27,70 +54,16 @@ export function App() {
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsAuthenticated(!!session);
-      if (!session) setScreen('login');
+      if (!session) navigate('/dashboard');
     });
     return () => subscription.unsubscribe();
   }, []);
 
-  // Still resolving auth state
   if (isAuthenticated === null) return null;
 
   if (!isAuthenticated) {
     return <LoginScreen onLogin={() => setIsAuthenticated(true)} />;
   }
 
-  const go = (s: Screen, data?: ProcessData) => {
-    setScreen(s);
-    if (data) setProcessData(data);
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
-      <TopNav autoSave={screen === 'review'} />
-
-      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <ErrorBoundary>
-          {screen === 'dashboard' && (
-            <Dashboard
-              onNew={() => go('upload')}
-              onOpen={(runId) => { go('review', { expName: '', runId }); }}
-            />
-          )}
-          {screen === 'upload' && (
-            <UploadScreen
-              onProcess={(d) => { setProcessData(d); go('processing', d); }}
-              onBack={() => go('dashboard')}
-            />
-          )}
-          {screen === 'processing' && (
-            <ProcessingScreen
-              expName={processData?.expName}
-              runId={processData?.runId}
-              onDone={() => go('review')}
-              onError={() => go('dashboard')}
-            />
-          )}
-          {screen === 'review' && (
-            <ReviewScreen
-              runId={processData?.runId}
-              onPublish={() => go('publish')}
-              onBack={() => go('dashboard')}
-            />
-          )}
-          {screen === 'publish' && (
-            <PublishConfirm
-              onConfirm={() => go('published')}
-              onEdit={() => go('review')}
-            />
-          )}
-          {screen === 'published' && (
-            <PublishedScreen
-              onDashboard={() => go('dashboard')}
-              onAnother={() => go('upload')}
-            />
-          )}
-        </ErrorBoundary>
-      </div>
-    </div>
-  );
+  return <AppShell />;
 }

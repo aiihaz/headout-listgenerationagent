@@ -1,11 +1,10 @@
+import { useNavigate } from 'react-router-dom';
 import { Check, ExternalLink, Settings, Plus } from 'lucide-react';
 
-interface PublishedScreenProps {
-  onDashboard: () => void;
-  onAnother: () => void;
-}
-
-export function PublishedScreen({ onDashboard, onAnother }: PublishedScreenProps) {
+export function PublishedScreen() {
+  const navigate = useNavigate();
+  const onDashboard = () => navigate('/dashboard');
+  const onAnother = () => navigate('/new');
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
       <div className="pop-in" style={{ textAlign: 'center', maxWidth: 480 }}>
