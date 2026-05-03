@@ -11,8 +11,8 @@ const CHECKLIST = [
 export function PublishConfirm() {
   const { runId } = useParams<{ runId: string }>();
   const navigate = useNavigate();
-  const onConfirm = () => navigate(`/runs/${runId}/published`);
-  const onEdit = () => navigate(`/runs/${runId}/review`);
+  const onConfirm = () => navigate(`/listings/${runId}/published`);
+  const onEdit = () => navigate(`/listings/${runId}/review`);
   const [checks, setChecks] = useState([false, false, false]);
   const allChecked = checks.every(Boolean);
   const toggle = (i: number) => setChecks(c => c.map((v, j) => j === i ? !v : v));

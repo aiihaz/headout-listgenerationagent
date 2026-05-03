@@ -113,7 +113,7 @@ export function UploadScreen() {
         }
       }
       const { run_id } = await api.createRun(supplierInput);
-      navigate(`/runs/${run_id}/processing`, { state: { expName: expName || 'New listing' } });
+      navigate(`/listings/${run_id}/processing`, { state: { expName: expName || 'New listing' } });
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Failed to start pipeline');
       setSubmitting(false);

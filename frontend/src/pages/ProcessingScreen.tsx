@@ -53,10 +53,10 @@ export function ProcessingScreen() {
   const [contextLine, setContextLine] = useState('Queued for processing…');
   const [failed, setFailed] = useState(false);
   const [failMessage, setFailMessage] = useState('');
-  const onDoneRef = useRef(() => navigate(`/runs/${runId}/review`));
+  const onDoneRef = useRef(() => navigate(`/listings/${runId}/review`));
   const onErrorRef = useRef(() => navigate('/dashboard'));
   useEffect(() => {
-    onDoneRef.current = () => navigate(`/runs/${runId}/review`);
+    onDoneRef.current = () => navigate(`/listings/${runId}/review`);
     onErrorRef.current = () => navigate('/dashboard');
   }, [runId]);
 
