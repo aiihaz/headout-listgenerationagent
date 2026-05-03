@@ -30,93 +30,63 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
   };
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      height: '100vh', background: 'var(--surface)',
-    }}>
-      <div className="fade-in" style={{
-        width: 380, padding: 40, background: '#fff',
-        borderRadius: 16, boxShadow: '0 4px 24px rgba(0,0,0,0.09)',
-      }}>
-        {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 32 }}>
-          <img src="/logo.svg" alt="Headout" style={{ height: 28 }} />
-          <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: 'var(--slate)' }}>
-            Listing Agent
-          </span>
+    <div className="login-page">
+      <div className="login-shell fade-in">
+        <div className="login-visual" aria-hidden="true">
+          <img src="/create.png" alt="" />
         </div>
 
-        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, marginBottom: 6 }}>
-          Sign in
-        </h1>
-        <p style={{ fontSize: 14, color: 'var(--ink60)', marginBottom: 28 }}>
-          Internal tool — catalog associates only.
-        </p>
-
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink60)', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-              autoFocus
-              placeholder="you@headout.com"
-              style={{
-                width: '100%', height: 40, border: '1.5px solid var(--border)',
-                borderRadius: 8, padding: '0 12px', fontSize: 14,
-                outline: 'none', fontFamily: 'inherit',
-                transition: 'border-color 150ms',
-              }}
-              onFocus={e => (e.target.style.borderColor = 'var(--purps)')}
-              onBlur={e => (e.target.style.borderColor = 'var(--border)')}
-            />
+        <section className="login-panel" aria-label="Sign in">
+          <div className="login-brand">
+            <img src="/headoutlogo.png" alt="Headout" />
+            <span>Listing Agent</span>
           </div>
 
-          <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink60)', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              placeholder="••••••••"
-              style={{
-                width: '100%', height: 40, border: '1.5px solid var(--border)',
-                borderRadius: 8, padding: '0 12px', fontSize: 14,
-                outline: 'none', fontFamily: 'inherit',
-                transition: 'border-color 150ms',
-              }}
-              onFocus={e => (e.target.style.borderColor = 'var(--purps)')}
-              onBlur={e => (e.target.style.borderColor = 'var(--border)')}
-            />
+          <div className="login-heading">
+            <h1>Sign in</h1>
+            <p>Internal tool — catalog associates only.</p>
           </div>
 
-          {error && (
-            <p style={{ fontSize: 13, color: 'var(--red)', margin: '-4px 0' }}>
-              {error}
-            </p>
-          )}
+          <form onSubmit={handleSubmit} className="login-form">
+            <div>
+              <label htmlFor="login-email">Email</label>
+              <input
+                id="login-email"
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+                autoFocus
+                placeholder="you@headout.com"
+              />
+            </div>
 
-          <button
-            type="submit"
-            disabled={loading || !email || !password}
-            style={{
-              marginTop: 4, height: 44, background: loading || !email || !password ? 'var(--ink30)' : 'var(--purps)',
-              color: '#fff', border: 'none', borderRadius: 8,
-              fontSize: 14, fontWeight: 600,
-              cursor: loading || !email || !password ? 'not-allowed' : 'pointer',
-              transition: 'background 150ms',
-            }}
-          >
-            {loading ? 'Signing in…' : 'Sign in'}
-          </button>
-        </form>
+            <div>
+              <label htmlFor="login-password">Password</label>
+              <input
+                id="login-password"
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                placeholder="••••••••"
+              />
+            </div>
+
+            {error && (
+              <p className="login-error">
+                {error}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading || !email || !password}
+            >
+              {loading ? 'Signing in...' : 'Sign in'}
+            </button>
+          </form>
+        </section>
       </div>
     </div>
   );

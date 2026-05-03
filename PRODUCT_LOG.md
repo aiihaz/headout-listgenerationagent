@@ -1,8 +1,8 @@
 # Headout AI Listing Generation Pipeline — Product Log
 
 > **Working directory**: `/Users/ihaz/Projects/list generation agent/`
-> **Last updated**: 2026-05-03 (Session 9)
-> **Status**: CLI pipeline complete. Frontend complete (all 6 screens, **now wired to real API**). Backend complete (Phases 1–2). **Phase 4 API wiring complete** — all 6 screens connected to FastAPI; `GET /api/v1/runs` list endpoint added; Supabase Auth login screen added; `ErrorBoundary` component added; `@supabase/supabase-js` installed; `mapRunToReviewData` mapper bridges `merged_listing.json` → `FieldData[]`; `tsconfig.json` fixed for `import.meta.env`; pre-existing `start_times` → `startTimes` test bug fixed. 7 tests passing. Deploy (Phase 4 final) is next.
+> **Last updated**: 2026-05-03 (Session 10)
+> **Status**: CLI pipeline complete. Frontend complete (all 6 screens, **now wired to real API**). Backend complete (Phases 1–2). **Phase 4 API wiring complete** — all 6 screens connected to FastAPI; Supabase Auth login screen added and visually refreshed with a split-card Headout login layout; `GET /api/v1/runs` list endpoint added; `ErrorBoundary` component added; `@supabase/supabase-js` installed; `mapRunToReviewData` mapper bridges `merged_listing.json` → `FieldData[]`; `tsconfig.json` fixed for `import.meta.env`; pre-existing `start_times` → `startTimes` test bug fixed. 7 tests passing. Deploy (Phase 4 final) is next.
 > **Repo**: https://github.com/aiihaz/headout-listgenerationagent (default branch: `staging`)
 
 ---
@@ -487,6 +487,24 @@ All 6 screens built, verified in browser, production build passing. See "Fronten
 ---
 
 ## Session History
+
+### Session 10 — Login Visual Refresh (2026-05-03)
+
+Updated the Supabase Auth login screen to match the requested two-panel reference layout while keeping the existing email/password sign-in flow unchanged.
+
+**Frontend changes:**
+- `frontend/src/pages/LoginScreen.tsx` — replaced the compact single-card login with a split card: left artwork panel and right login form panel; preserved the existing `signIn(email, password)` behavior, loading state, validation, and error handling.
+- `frontend/src/index.css` — added responsive login styles for desktop and mobile, including the centered white shell, soft purple page background, image panel, Headout logo row, form controls, button states, and mobile stacking.
+- `frontend/public/headoutlogo.png` — added the supplied Headout logo asset for the form panel.
+- `frontend/public/create.png` — added the supplied final left-panel artwork with embedded text.
+
+**Iteration note:**
+- Initial artwork used `createxperiences.png`; updated to `create.png` after the final image was supplied.
+- Removed the added overlay headline/caption because the copy is now embedded in the artwork itself.
+
+**Build:** `npm run build` passes.
+
+---
 
 ### Session 9 — Frontend API Wiring + Auth (2026-05-03)
 
