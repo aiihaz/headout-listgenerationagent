@@ -189,12 +189,9 @@ def run(
         _save_final(run_dir, ctx)
         return _result(ctx)
 
-    if ctx.review.review.escalate_to_human:
-        ctx.state = PipelineState.ESCALATED_TO_HUMAN
-        _notify(ctx.state, status_callback)
-        _save_escalation(run_dir, ctx)
-        return _result(ctx)
-
+    # Always attempt regen when there are regenerate blockers — even if escalate_to_human is true.
+    # escalate_to_human on a first pass reflects Review Agent uncertainty, not a blocker the regen
+    # can't fix. The second pass will escalate if regen didn't resolve the issues.
     ctx.state = PipelineState.REGENERATION_IN_PROGRESS
     _notify(ctx.state, status_callback)
     blockers = [b.model_dump() for b in regen_blockers]
