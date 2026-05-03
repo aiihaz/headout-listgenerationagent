@@ -59,10 +59,10 @@ The pipeline converts raw supplier data into a publish-ready Headout listing: co
 
 | Agent | Model | Role | Input | Output |
 |---|---|---|---|---|
-| Agent 1: Intake | Gemini 2.5 Flash | Classify and structure raw supplier data | Raw supplier payload (any format) | `intake.json` |
-| Agent 2: Content Generator | Gemini 2.5 Flash | Generate all listing copy and SEO artifacts | `intake.json` | `listing.json` |
+| Agent 1: Intake | OpenAI `gpt-5-mini` | Classify and structure raw supplier data | Raw supplier payload (any format) | `intake.json` |
+| Agent 2: Content Generator | OpenAI `gpt-5-mini` | Generate all listing copy and SEO artifacts | `intake.json` | `listing.json` |
 | Template Engine | Deterministic code | Map intake fields to schema.org JSON-LD | `intake.json` | `verified_json_ld.json` + `verified_json_ld_meta.json` |
-| Agent 3: Review | Gemini 2.5 Flash | Independent factual + voice + SEO quality check | `intake.json` + `listing.json` + `verified_json_ld.json` | `review.json` |
+| Agent 3: Review | OpenAI `gpt-5-mini` | Independent factual + voice + SEO quality check | `intake.json` + `listing.json` + `verified_json_ld.json` | `review.json` |
 
 ---
 
@@ -82,21 +82,21 @@ The pipeline converts raw supplier data into a publish-ready Headout listing: co
 
 **API call**:
 ```
-model: gemini-2.5-flash
+model: gpt-5-mini
 system: [contents of agent_prompt_supplier_intake.md]
 user: [raw supplier data]
-response_mime_type: application/json
-temperature: 0
+Responses API JSON mode
+reasoning_effort: low
 ```
 
 **Output**: `intake.json` — complete structured listing object with all fields classified and flagged (CONDITIONAL, DEFERRED, null as appropriate).
 
 **On error**:
-- If Gemini returns malformed JSON: retry once with explicit instruction to fix JSON
+- If OpenAI returns malformed JSON: retry once with explicit instruction to fix JSON
 - If retry fails: halt pipeline, log `intake_failed`, notify operator
 - Do not proceed to Step 2 without a valid `intake.json`
 
-**Rate limit**: Gemini 2.5 Flash: 10 RPM (free tier), 1000 RPM (paid). Throttle accordingly. Queue intake jobs if needed.
+**Rate limit**: OpenAI limits vary by account tier and model. Throttle by the account's current `gpt-5-mini` RPM/TPM limits and queue intake jobs if needed.
 
 ---
 
@@ -112,12 +112,11 @@ Run both in parallel immediately after Step 1 completes. They are independent of
 
 **API call**:
 ```
-model: gemini-2.5-flash
+model: gpt-5-mini
 system: [contents of agent_prompt_content_generator.md]
 user: [intake.json serialized as string]
-response_mime_type: application/json
-response_schema: [listing JSON schema — see agent_prompt_content_generator.md]
-temperature: 0.7
+Responses API JSON mode
+reasoning_effort: low
 ```
 
 Note: temperature 0.7 for copy generation (allows creative variance). The Review Agent catches errors; this is not a correctness step.
@@ -163,11 +162,11 @@ The orchestrator creates `merged_listing.json` by:
 **Input**: Two documents passed as context
 
 ```
-model: gemini-2.5-flash
+model: gpt-5-mini
 system: [contents of agent_prompt_review.md]
 user: [structured prompt — see below]
-response_mime_type: application/json
-temperature: 0
+Responses API JSON mode
+reasoning_effort: low
 ```
 
 Note: temperature 0 for the review agent. This is a verification step, not a creative one. Determinism matters.
@@ -255,11 +254,11 @@ Merge these into the existing output — everything else stays unchanged.
 
 **API call**:
 ```
-model: gemini-2.5-flash
+model: gpt-5-mini
 system: [agent_prompt_content_generator.md]
 user: [regeneration prompt above]
-response_mime_type: application/json
-temperature: 0.3
+Responses API JSON mode
+reasoning_effort: low
 ```
 
 Note: lower temperature for regeneration — the agent has specific instructions to follow.
@@ -399,9 +398,8 @@ Failure states (terminal without human intervention):
 
 ## Rate Limit Handling
 
-Gemini 2.5 Flash limits (as of spec writing):
-- Free tier: 10 RPM, 250K TPM
-- Paid tier: 1000 RPM, 1M TPM
+OpenAI `gpt-5-mini` limits:
+- Limits vary by account tier. Read the account's current RPM/TPM limits and throttle the worker queue accordingly.
 
 Each pipeline run consumes 3 LLM calls (Intake + Content Generator + Review). Regeneration adds 1-2 more.
 
@@ -473,12 +471,13 @@ All files stored per run at: `listings/{listing_id}/runs/{run_id}/`
 
 ```json
 {
-  "model": "gemini-2.5-flash",
-  "temperature": {
-    "intake": 0,
-    "content_generator": 0.7,
-    "content_generator_regen": 0.3,
-    "review": 0
+  "model": "gpt-5-mini",
+  "api": "OpenAI Responses API",
+  "reasoning": {
+    "intake": "low",
+    "content_generator": "low",
+    "content_generator_regen": "low",
+    "review": "low"
   },
   "timeouts_ms": {
     "intake": 60000,
@@ -491,8 +490,7 @@ All files stored per run at: `listings/{listing_id}/runs/{run_id}/`
     "regeneration_attempts": 2
   },
   "rate_limit": {
-    "rpm": 10,
-    "tpm": 250000
+    "source": "OpenAI account tier limits for selected model"
   }
 }
 ```
@@ -514,5 +512,5 @@ Before deploying the pipeline, verify these scenarios end-to-end:
 | Content Generator uses banned opener | Review Agent flags voice_violation, regen fixes it |
 | Same hallucination appears after regen | 2nd review fails → human escalation |
 | 3+ hallucination blockers on first review | `escalate_to_human: true` immediately, no regen |
-| Gemini API timeout | Retry once, then log error and halt |
+| OpenAI API timeout | Retry once, then log error and halt |
 | Template Engine fatal validation (e.g. malformed price) | Halt pipeline, log `schema_fatal` |

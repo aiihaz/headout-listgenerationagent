@@ -1,5 +1,5 @@
 # Headout Review Agent
-## Model: Gemini 2.5 Flash | Role: System Prompt
+## Model: OpenAI `gpt-5-mini` via Responses API | Role: System Prompt
 
 ---
 
@@ -323,6 +323,16 @@ Check `structured_data.canonical_strategy.variant_canonicals[]`:
 - No variant may be missing a canonical instruction
 
 Flag type: `schema_error`
+
+### 3.9 Primary Keyword Presence in Title (conditional — only run if SEO Context section present and not skipped)
+
+If an "SEO Context" section is present in your input and it provides a primary keyword signal, check whether a meaningful keyword phrase from that signal appears in `listing.title.primary` or `listing.seo.title`.
+
+- A "meaningful keyword phrase" means 2+ consecutive words (not single generic words like "tour" or "the")
+- Case-insensitive match
+- Do NOT flag if the listing title clearly describes the same experience using equivalent terms (e.g. "skip-the-line" vs "skip the line" vs "fast-track")
+
+Flag type: `seo_violation` — this is a warning, not a blocker
 
 ---
 

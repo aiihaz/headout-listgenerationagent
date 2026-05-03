@@ -79,7 +79,7 @@ export function mapRunToReviewData(
     source: sourceLabel(sources, 'exclusions'),
   } satisfies FieldData));
 
-  type FaqItem = { question: string; answer: string };
+  type FaqItem = { question: string; answer: string; paa_source?: string };
   const faqItems = ((listing.faqs as FaqItem[]) ?? []);
   const faqs: FieldData[] = faqItems.flatMap((faq, i) => [
     {
@@ -88,7 +88,9 @@ export function mapRunToReviewData(
       value: faq.question,
       status: fieldStatus(`faqs[${i}].question`, blockers, warnings),
       reason: fixReason(`faqs[${i}].question`, blockers),
-      source: sourceLabel(sources, 'faqs'),
+      source: faq.paa_source
+        ? `Google users also ask: "${faq.paa_source}"`
+        : sourceLabel(sources, 'faqs'),
     } satisfies FieldData,
     {
       id: `fa${i + 1}`,
@@ -96,7 +98,9 @@ export function mapRunToReviewData(
       value: faq.answer,
       status: fieldStatus(`faqs[${i}].answer`, blockers, warnings),
       reason: fixReason(`faqs[${i}].answer`, blockers),
-      source: sourceLabel(sources, 'faqs'),
+      source: faq.paa_source
+        ? `Google users also ask: "${faq.paa_source}"`
+        : sourceLabel(sources, 'faqs'),
     } satisfies FieldData,
   ]);
 

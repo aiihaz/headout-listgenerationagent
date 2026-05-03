@@ -7,6 +7,7 @@ from .listing import (
     PublishVerdict, StructuredDataBlock, ContentGeneratorError,
 )
 from .review import ReviewOutput, ReviewDetail, ReviewBlocker, ReviewWarning, ReviewScores
+from .serper import SerperContext, SerperOrganic
 
 __all__ = [
     "IntakeResult", "IntakeMeta", "AmbiguityFlag", "DesignDecision",
@@ -14,4 +15,5 @@ __all__ = [
     "ListingOutput", "Listing", "Variant", "FAQ", "SEO", "ABTestPlan",
     "PublishVerdict", "StructuredDataBlock", "ContentGeneratorError",
     "ReviewOutput", "ReviewDetail", "ReviewBlocker", "ReviewWarning", "ReviewScores",
+    "SerperContext", "SerperOrganic",
 ]

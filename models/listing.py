@@ -1,5 +1,12 @@
-from typing import Optional
-from pydantic import BaseModel, Field
+from typing import Any, Optional
+from pydantic import BaseModel, Field, field_validator
+
+
+def _coerce_str_to_list(v: Any) -> Any:
+    """LLMs occasionally return a bare string instead of a one-item list."""
+    if isinstance(v, str):
+        return [v]
+    return v
 
 
 class TitleField(BaseModel):
@@ -35,16 +42,27 @@ class KnowBeforeYouGo(BaseModel):
     accessibility: str = ""
     additional: list[str] = Field(default_factory=list)
 
+    @field_validator("what_to_bring", "whats_not_allowed", "additional", mode="before")
+    @classmethod
+    def coerce_to_list(cls, v: Any) -> Any:
+        return _coerce_str_to_list(v)
+
 
 class FAQ(BaseModel):
     question: str
     answer: str
+    paa_source: Optional[str] = None
 
 
 class SEO(BaseModel):
     title: str
     meta_description: str
     tags: list[str]
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def coerce_to_list(cls, v: Any) -> Any:
+        return _coerce_str_to_list(v)
 
 
 class Listing(BaseModel):
@@ -59,6 +77,11 @@ class Listing(BaseModel):
     faqs: list[FAQ]
     seo: SEO
 
+    @field_validator("highlights", "inclusions", "exclusions", "important_information", mode="before")
+    @classmethod
+    def coerce_to_list(cls, v: Any) -> Any:
+        return _coerce_str_to_list(v)
+
 
 class Variant(BaseModel):
     name: str
@@ -68,6 +91,11 @@ class Variant(BaseModel):
     key_differentiators: list[str]
     upsell_hook: Optional[str] = None
 
+    @field_validator("key_differentiators", mode="before")
+    @classmethod
+    def coerce_to_list(cls, v: Any) -> Any:
+        return _coerce_str_to_list(v)
+
 
 class ABTestPlan(BaseModel):
     priority_test: str
@@ -76,11 +104,11 @@ class ABTestPlan(BaseModel):
 
 
 class CopyQualityScore(BaseModel):
-    title: str
-    description: str
-    highlights: str
-    faqs: str
-    seo: str
+    title: str = ""
+    description: str = ""
+    highlights: str = ""
+    faqs: str = ""
+    seo: str = ""
 
 
 class PublishVerdict(BaseModel):
@@ -88,7 +116,12 @@ class PublishVerdict(BaseModel):
     confidence: str
     blockers: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
-    copy_quality_score: CopyQualityScore
+    copy_quality_score: CopyQualityScore = Field(default_factory=CopyQualityScore)
+
+    @field_validator("blockers", "warnings", mode="before")
+    @classmethod
+    def coerce_to_list(cls, v: Any) -> Any:
+        return _coerce_str_to_list(v)
 
 
 class VariantCanonical(BaseModel):

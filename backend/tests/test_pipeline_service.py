@@ -1,5 +1,5 @@
 """
-Backend pipeline service tests. No Supabase or Gemini API keys required.
+Backend pipeline service tests. No Supabase or OpenAI API keys required.
 
 Three invariants:
   1. Any exception in orchestrator.run → status "generation_blocked" pushed to queue
@@ -27,17 +27,17 @@ def test_pipeline_blocked_on_orchestrator_exception():
     status_q: queue.Queue = queue.Queue()
 
     with (
-        patch("backend.services.pipeline_service.genai") as mock_genai,
-        patch("orchestrator.run", side_effect=RuntimeError("Gemini DeadlineExceeded")),
+        patch("backend.services.pipeline_service.OpenAI") as mock_openai,
+        patch("orchestrator.run", side_effect=RuntimeError("OpenAI API timeout")),
     ):
-        mock_genai.Client.return_value = MagicMock()
+        mock_openai.return_value = MagicMock()
         _sync_pipeline("run-abc", "some supplier text", status_q)
 
     collected = []
     while not status_q.empty():
         collected.append(status_q.get_nowait())
 
-    assert ("generation_blocked", "Gemini DeadlineExceeded") in collected
+    assert ("generation_blocked", "OpenAI API timeout") in collected
     assert collected[-1] is None  # sentinel always pushed in finally block
 
 

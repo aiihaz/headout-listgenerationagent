@@ -14,7 +14,7 @@ from pathlib import Path
 
 import typer
 from dotenv import load_dotenv
-from google import genai
+from openai import OpenAI
 from rich.console import Console
 from rich.panel import Panel
 from rich.rule import Rule
@@ -34,9 +34,9 @@ def main(
     input: Path = typer.Option(..., "--input", "-i", help="Path to supplier data file"),
     output: Path = typer.Option(None, "--output", "-o", help="Path to write final listing JSON"),
 ) -> None:
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        console.print("[bold red]Error:[/] GEMINI_API_KEY not set. Add it to .env or export it.")
+        console.print("[bold red]Error:[/] OPENAI_API_KEY not set. Add it to .env or export it.")
         raise typer.Exit(1)
 
     if not input.exists():
@@ -44,7 +44,7 @@ def main(
         raise typer.Exit(1)
 
     supplier_text = input.read_text()
-    client = genai.Client(api_key=api_key)
+    client = OpenAI(api_key=api_key)
 
     console.print()
     console.print(Panel.fit(
@@ -57,7 +57,7 @@ def main(
     console.print("[dim][1/5][/] Checking for duplicates in local listing store...")
 
     # ── Step 2: Run full pipeline ─────────────────────────────────────────
-    console.print("[dim][2/5][/] Running Intake Agent (Gemini 2.5 Flash, temp 0)...")
+    console.print("[dim][2/5][/] Running Intake Agent (OpenAI Responses API, gpt-5-mini)...")
 
     result = run_pipeline(supplier_text, client)
 

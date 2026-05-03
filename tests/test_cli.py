@@ -1,6 +1,6 @@
 """
 Pipeline invariant tests. No Supabase required — exercises the CLI orchestrator
-directly with mocked Gemini calls so these run in CI without API keys.
+directly with mocked OpenAI calls so these run in CI without API keys.
 
 Four invariants:
   1. CONTRADICTED input → state == intake_failed (pipeline halts)

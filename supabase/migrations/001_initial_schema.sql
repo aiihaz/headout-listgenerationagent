@@ -32,7 +32,7 @@ CREATE TABLE runs (
   duplicate_run_id UUID REFERENCES runs(id),
   duplicate_score  FLOAT,
 
-  model           TEXT DEFAULT 'gemini-2.5-flash',
+  model           TEXT DEFAULT 'gpt-5-mini',
   regeneration_count INTEGER DEFAULT 0,
 
   error_message   TEXT

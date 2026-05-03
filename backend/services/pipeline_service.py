@@ -10,12 +10,13 @@ Pattern:
 
 import asyncio
 import json
+import os
 import queue
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Optional
 
-from google import genai
+from openai import OpenAI
 
 from backend.config import settings
 from backend.services import supabase_service
@@ -23,6 +24,18 @@ from backend.services import supabase_service
 _executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="pipeline")
 
 LISTINGS_DIR = Path("listings")
+
+
+def _apply_openai_model_settings() -> None:
+    for name in (
+        "OPENAI_MODEL",
+        "OPENAI_INTAKE_MODEL",
+        "OPENAI_CONTENT_MODEL",
+        "OPENAI_REVIEW_MODEL",
+    ):
+        value = getattr(settings, name, None)
+        if value:
+            os.environ[name] = value
 
 
 # ---------------------------------------------------------------------------
@@ -35,9 +48,10 @@ def _sync_pipeline(
     status_q: "queue.Queue[Optional[tuple]]",
 ) -> None:
     """Runs in a ThreadPoolExecutor thread. Never awaits anything."""
+    _apply_openai_model_settings()
     import orchestrator
 
-    client = genai.Client(api_key=settings.GEMINI_API_KEY)
+    client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
     def on_status(state: str, error: Optional[str] = None) -> None:
         status_q.put((state, error))
@@ -48,6 +62,7 @@ def _sync_pipeline(
             client,
             run_id=run_id,
             status_callback=on_status,
+            serper_api_key=settings.SERPER_API_KEY,
         )
     except Exception as exc:
         status_q.put(("generation_blocked", str(exc)))
@@ -69,6 +84,7 @@ async def _drain_status(run_id: str, status_q: "queue.Queue[Optional[tuple]]") -
 _ARTIFACT_FILES = {
     "intake": "intake.json",
     "listing": "listing.json",
+    "serper_context": "serper_context.json",
     "merged_listing": "merged_listing.json",
     "review": "review.json",
     "escalation_record": "escalation_record.json",
@@ -113,12 +129,14 @@ def _sync_regeneration(
     status_q: "queue.Queue[Optional[tuple]]",
 ) -> None:
     """Runs in a ThreadPoolExecutor thread. Loads artifacts, regens one section, re-reviews."""
+    _apply_openai_model_settings()
     from agents import content_generator, review_agent
     from models.intake import IntakeResult
     from models.listing import ListingOutput
+    from models.serper import SerperContext
     from orchestrator import _merge, _merged_to_dict, _save, _save_escalation, PipelineRun, PipelineState
 
-    client = genai.Client(api_key=settings.GEMINI_API_KEY)
+    client = OpenAI(api_key=settings.OPENAI_API_KEY)
     run_dir = LISTINGS_DIR / run_id
 
     try:
@@ -142,6 +160,15 @@ def _sync_regeneration(
         previous_listing = ListingOutput.model_validate(merged_data)
         existing_json_ld = merged_data.get("structured_data", {}).get("json_ld", {})
 
+        # Load serper context if available (best-effort)
+        serper_context = None
+        serper_path = run_dir / "serper_context.json"
+        if serper_path.exists():
+            try:
+                serper_context = SerperContext.model_validate(json.loads(serper_path.read_text()))
+            except Exception:
+                pass
+
         scope = [section]
         blockers = [
             {
@@ -152,14 +179,15 @@ def _sync_regeneration(
         ]
 
         regen_listing = content_generator.run_targeted_regen(
-            intake, previous_listing, scope, blockers, client
+            intake, previous_listing, scope, blockers, client,
+            serper_context=serper_context,
         )
         new_merged = _merge(regen_listing, existing_json_ld)
 
         _save(run_dir / "merged_listing_v2.json", _merged_to_dict(new_merged, intake))
 
         # Re-run review on the updated listing
-        review_result = review_agent.run(intake, new_merged, client, is_regen_pass=True)
+        review_result = review_agent.run(intake, new_merged, client, is_regen_pass=True, serper_context=serper_context)
         _save(run_dir / "review_v2.json", review_result.model_dump())
 
         if review_result.review.overall in ("pass", "conditional_pass"):

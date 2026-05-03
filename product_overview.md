@@ -79,7 +79,7 @@ The system has four processing components and one review interface.
   └── No duplicate → continue
            │
            ▼
-  [Agent 1: Intake Agent]             Model: Gemini 2.5 Flash | Temp: 0
+  [Agent 1: Intake Agent]             Model: OpenAI gpt-5-mini | Reasoning: low
   Classifies and structures raw supplier data into intake.json
            │
            ▼
@@ -92,8 +92,8 @@ The system has four processing components and one review interface.
   │                    PARALLEL                             │
   │                                                        │
   │  [Agent 2: Content Generator]    [Template Engine]     │
-  │  Model: Gemini 2.5 Flash         Deterministic code    │
-  │  Temp: 0.7                       No LLM                │
+  │  Model: OpenAI gpt-5-mini        Deterministic code    │
+  │  Responses API JSON mode         No LLM                │
   │  Produces all copy, SEO,         Maps intake fields     │
   │  strategy, A/B plan              to TourActivity +      │
   │                                  FAQPage +              │
@@ -104,7 +104,7 @@ The system has four processing components and one review interface.
   Template Engine JSON-LD is authoritative for @graph block
            │
            ▼
-  [Agent 3: Review Agent]             Model: Gemini 2.5 Flash | Temp: 0
+  [Agent 3: Review Agent]             Model: OpenAI gpt-5-mini | Reasoning: low
   Independent critic — three layers:
   Layer 1: Factual accuracy vs intake.json (9 checks)
   Layer 2: Headout voice compliance (8 checks)
@@ -143,10 +143,10 @@ queue    trigger    logged
 
 | Component | Type | Model | Temperature | Input | Output |
 |---|---|---|---|---|---|
-| Intake Agent | LLM | Gemini 2.5 Flash | 0 | Raw supplier data | `intake.json` |
-| Content Generator | LLM | Gemini 2.5 Flash | 0.7 (0.3 on regen) | `intake.json` | `listing.json` |
+| Intake Agent | LLM | OpenAI `gpt-5-mini` | Reasoning low; JSON mode | Raw supplier data | `intake.json` |
+| Content Generator | LLM | OpenAI `gpt-5-mini` | Reasoning low; JSON mode | `intake.json` | `listing.json` |
 | Template Engine | Deterministic code | — | — | `intake.json` | `verified_json_ld.json` |
-| Review Agent | LLM | Gemini 2.5 Flash | 0 | `intake.json` + `merged_listing.json` | `review.json` |
+| Review Agent | LLM | OpenAI `gpt-5-mini` | Reasoning low; JSON mode | `intake.json` + `merged_listing.json` | `review.json` |
 
 ### Key Design Principles
 

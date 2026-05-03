@@ -16,19 +16,19 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-from google import genai
-
 from agents import (
     content_generator,
     duplicate_detector,
     email_generator,
     intake_agent,
     review_agent,
+    serper_agent,
     template_engine,
 )
 from models.intake import IntakeResult
 from models.listing import ListingOutput
 from models.review import ReviewOutput
+from models.serper import SerperContext
 
 LISTINGS_DIR = Path("listings")
 
@@ -43,6 +43,9 @@ class PipelineState(str, Enum):
     READY_FOR_PUBLISH = "ready_for_publish"
     REGENERATION_IN_PROGRESS = "regeneration_in_progress"
     ESCALATED_TO_HUMAN = "escalated_to_human"
+    SERPER_IN_PROGRESS = "serper_in_progress"
+    SERPER_COMPLETE = "serper_complete"
+    SERPER_SKIPPED = "serper_skipped"
     INTAKE_FAILED = "intake_failed"
     GENERATION_BLOCKED = "generation_blocked"
 
@@ -56,6 +59,7 @@ class PipelineRun:
     json_ld: Optional[dict] = None
     merged_listing: Optional[ListingOutput] = None
     review: Optional[ReviewOutput] = None
+    serper_context: Optional[SerperContext] = None
     duplicates: list[dict] = field(default_factory=list)
     supplier_email_draft: Optional[str] = None
     error: Optional[str] = None
@@ -85,9 +89,10 @@ def _notify(state: PipelineState, callback: Optional[StatusCallback], error: Opt
 
 def run(
     supplier_text: str,
-    client: genai.Client,
+    client: Any,
     run_id: Optional[str] = None,
     status_callback: Optional[StatusCallback] = None,
+    serper_api_key: str = "",
 ) -> PipelineResult:
     if run_id is None:
         run_id = str(uuid.uuid4())[:8]
@@ -118,12 +123,20 @@ def run(
         ctx.intake.meta.supplier, ctx.intake.ambiguity_flags
     )
 
+    # Step 2.5 — Serper SEO research (graceful degrade: never blocks pipeline)
+    ctx.state = PipelineState.SERPER_IN_PROGRESS
+    _notify(ctx.state, status_callback)
+    ctx.serper_context = serper_agent.run(ctx.intake, client, serper_api_key)
+    ctx.state = PipelineState.SERPER_SKIPPED if ctx.serper_context.skipped else PipelineState.SERPER_COMPLETE
+    _notify(ctx.state, status_callback)
+    _save(run_dir / "serper_context.json", ctx.serper_context.model_dump())
+
     # Step 3 — Content Generator + Template Engine in parallel
     ctx.state = PipelineState.GENERATION_IN_PROGRESS
     _notify(ctx.state, status_callback)
     try:
         with ThreadPoolExecutor(max_workers=2) as pool:
-            gen_future = pool.submit(content_generator.run, ctx.intake, client)
+            gen_future = pool.submit(content_generator.run, ctx.intake, client, ctx.serper_context)
             te_future = pool.submit(template_engine.run, ctx.intake)
             listing_raw = gen_future.result()
             json_ld = te_future.result()
@@ -147,7 +160,7 @@ def run(
     ctx.state = PipelineState.REVIEW_IN_PROGRESS
     _notify(ctx.state, status_callback)
     try:
-        ctx.review = review_agent.run(ctx.intake, ctx.merged_listing, client, is_regen_pass=False)
+        ctx.review = review_agent.run(ctx.intake, ctx.merged_listing, client, is_regen_pass=False, serper_context=ctx.serper_context)
         _save(run_dir / "review.json", ctx.review.model_dump())
     except Exception as exc:
         ctx.error = str(exc)
@@ -177,7 +190,8 @@ def run(
 
     try:
         regen_listing = content_generator.run_targeted_regen(
-            ctx.intake, ctx.merged_listing, scope, blockers, client
+            ctx.intake, ctx.merged_listing, scope, blockers, client,
+            serper_context=ctx.serper_context,
         )
         ctx.merged_listing = _merge(regen_listing, ctx.json_ld)
         _save(run_dir / "merged_listing_v2.json", _merged_to_dict(ctx.merged_listing, ctx.intake))
@@ -190,7 +204,7 @@ def run(
 
     # Second review pass
     try:
-        ctx.review = review_agent.run(ctx.intake, ctx.merged_listing, client, is_regen_pass=True)
+        ctx.review = review_agent.run(ctx.intake, ctx.merged_listing, client, is_regen_pass=True, serper_context=ctx.serper_context)
         _save(run_dir / "review_v2.json", ctx.review.model_dump())
     except Exception as exc:
         ctx.state = PipelineState.ESCALATED_TO_HUMAN

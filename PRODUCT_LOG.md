@@ -1,8 +1,8 @@
 # Headout AI Listing Generation Pipeline — Product Log
 
 > **Working directory**: `/Users/ihaz/Projects/list generation agent/`
-> **Last updated**: 2026-05-03 (Session 10)
-> **Status**: CLI pipeline complete. Frontend complete (all 6 screens, **now wired to real API**). Backend complete (Phases 1–2). **Phase 4 API wiring complete** — all 6 screens connected to FastAPI; Supabase Auth login screen added and visually refreshed with a split-card Headout login layout; `GET /api/v1/runs` list endpoint added; `ErrorBoundary` component added; `@supabase/supabase-js` installed; `mapRunToReviewData` mapper bridges `merged_listing.json` → `FieldData[]`; `tsconfig.json` fixed for `import.meta.env`; pre-existing `start_times` → `startTimes` test bug fixed. 7 tests passing. Deploy (Phase 4 final) is next.
+> **Last updated**: 2026-05-03 (Session 13)
+> **Status**: CLI pipeline complete and **verified end-to-end with OpenAI**. Frontend complete (all 6 screens, wired to real API, **deployed to Vercel**). Backend complete (Phases 1–2). OpenAI migration complete — model corrected to `gpt-4o-mini`, Pydantic models hardened for LLM output variance. **Serper API SEO intelligence integrated** — PAA → FAQ seeds, competitor titles → A/B context, related searches → tag candidates, Layer 3 check 9. **Frontend live at https://headout-listing-agent.vercel.app**. Backend deploy to Render is next.
 > **Repo**: https://github.com/aiihaz/headout-listgenerationagent (default branch: `staging`)
 
 ---
@@ -20,7 +20,8 @@ Headout signs 50+ new supplier experiences per month. Each listing currently tak
 ```bash
 # 1. Set your API key
 cp .env.example .env
-# Edit .env and add: GEMINI_API_KEY=your_key_here
+# Edit .env and add: OPENAI_API_KEY=your_key_here
+# Optional: override OPENAI_MODEL / OPENAI_INTAKE_MODEL / OPENAI_CONTENT_MODEL / OPENAI_REVIEW_MODEL
 
 # 2. Install dependencies
 pip install -r requirements.txt
@@ -87,22 +88,25 @@ python3 generate_listing.py --input examples/supplier_happy_path.txt --output my
 
 | File | Role | Status |
 |---|---|---|
-| `requirements.txt` | `google-genai`, pydantic, typer, rich, python-dotenv | Done |
+| `requirements.txt` | `openai`, pydantic, typer, rich, python-dotenv | Done |
 | `models/intake.py` | Pydantic models: IntakeResult, IntakeMeta, AmbiguityFlag, DesignDecision | Done |
-| `models/listing.py` | Pydantic models: ListingOutput, Listing, Variant, FAQ, SEO, PublishVerdict | Done |
+| `models/listing.py` | Pydantic models: ListingOutput, Listing, Variant, FAQ (+ `paa_source`), SEO, PublishVerdict; `_coerce_str_to_list` validator on all `list[str]` fields; `CopyQualityScore` fields and `copy_quality_score` made optional with defaults | Done — updated 2026-05-03 |
 | `models/review.py` | Pydantic models: ReviewOutput, ReviewDetail, ReviewBlocker, ReviewWarning | Done |
-| `models/__init__.py` | Package exports | Done |
-| `agents/intake_agent.py` | Gemini call, 2-attempt JSON retry | Done |
-| `agents/content_generator.py` | Gemini call + targeted regeneration logic | Done |
+| `models/serper.py` | Pydantic models: SerperContext, SerperOrganic | Done — 2026-05-03 |
+| `models/__init__.py` | Package exports — includes SerperContext, SerperOrganic | Done — updated 2026-05-03 |
+| `agents/llm_client.py` | Shared OpenAI Responses API JSON helper; default/per-agent model env vars; default model corrected to `gpt-4o-mini` | Done — 2026-05-03 |
+| `agents/intake_agent.py` | OpenAI Responses API call, 2-attempt JSON retry | Done |
+| `agents/serper_agent.py` | LLM query gen (temp 0) + Serper API call + graceful degrade on all failure modes (blank key, timeout, 401, 429, bad JSON) | Done — 2026-05-03 |
+| `agents/content_generator.py` | OpenAI Responses API call + targeted regen logic; accepts `serper_context` and builds SEO Research Context section in user prompt | Done — updated 2026-05-03 |
 | `agents/template_engine.py` | Deterministic Python: intake payload → schema.org JSON-LD | Done |
-| `agents/review_agent.py` | Gemini call, auto-escalates on second review pass | Done |
+| `agents/review_agent.py` | OpenAI Responses API call, auto-escalates on second review pass; accepts `serper_context` and injects keyword signal / skip note | Done — updated 2026-05-03 |
 | `agents/duplicate_detector.py` | difflib similarity check against `listings/` directory | Done |
 | `agents/email_generator.py` | Formats ambiguity_flags → supplier clarification email draft | Done |
-| `orchestrator.py` | 12-state pipeline machine, saves all artifacts per run | Done |
+| `orchestrator.py` | 15-state pipeline machine, saves all artifacts per run; serper step between intake and generation | Done — updated 2026-05-03 |
 | `generate_listing.py` | Typer CLI with Rich console output | Done |
 | `examples/supplier_happy_path.txt` | Dubai Desert Safari — clean input with CONDITIONAL tower access | Done |
 | `examples/supplier_contradiction.txt` | Same supplier — pickup time contradicted (3:30 PM vs 4:00 PM) | Done |
-| `.env.example` | Template: `GEMINI_API_KEY=your_key_here` | Done |
+| `.env.example` | Template: `OPENAI_API_KEY=your_key_here`, default model overrides | Done |
 
 ### Frontend — React + Vite + TypeScript
 
@@ -118,7 +122,7 @@ Design source: `experience-onboarding-agent/` bundle (Headout design system — 
 | `frontend/public/logo.svg` | Headout logo | Done |
 | `frontend/public/fonts/` | Halyard Display + Halyard Text (.otf) | Done |
 | `frontend/src/index.css` | Headout design tokens: CSS custom properties, font faces, animations | Done |
-| `frontend/src/types.ts` | TypeScript types: Screen, FieldData, ListingRow, ProcessData, etc. | Done |
+| `frontend/src/types.ts` | TypeScript types: Screen, FieldData, ListingRow, ProcessData, RunStatus (includes `serper_in_progress`, `serper_complete`, `serper_skipped`), etc. | Done — updated 2026-05-03 |
 | `frontend/src/main.tsx` | React root | Done |
 | `frontend/src/App.tsx` | Screen router (dashboard → upload → processing → review → publish → published) | Done |
 | `frontend/src/components/TopNav.tsx` | Nav bar: logo, "Listing Agent" label, autosave indicator, user avatar | Done |
@@ -126,7 +130,7 @@ Design source: `experience-onboarding-agent/` bundle (Headout design system — 
 | `frontend/src/components/FieldComponent.tsx` | Core field: A/B/C tab switcher, inline edit, source quote popover, regenerate confirm, flag detail expander, "Raise with supplier" | Done |
 | `frontend/src/pages/Dashboard.tsx` | Screen 1: listings table, status pills with flag counts, search, status filters | Done |
 | `frontend/src/pages/UploadScreen.tsx` | Screen 2: paste tab + file drag-and-drop + supplier autocomplete dropdown | Done |
-| `frontend/src/pages/ProcessingScreen.tsx` | Screen 3: animated stage stepper (6 stages), live progress bar, context line | Done |
+| `frontend/src/pages/ProcessingScreen.tsx` | Screen 3: animated stage stepper (6 stages), live progress bar, context line; stage 2 updated to "Researching search landscape" covering serper states | Done — updated 2026-05-03 |
 | `frontend/src/pages/ReviewScreen.tsx` | Screen 4: horizontal section nav with status dots, verdict banner, supplier clarification modal, operating hours module | Done |
 | `frontend/src/pages/PublishConfirm.tsx` | Screen 5: listing summary card, checklist gate (Publish disabled until all checked) | Done |
 | `frontend/src/pages/PublishedScreen.tsx` | Screen 6: success state, "View on Headout" / "View in admin" links | Done |
@@ -144,9 +148,10 @@ Located at `backend/`. Run with `uvicorn backend.main:app --reload`. Requires no
 
 | File | Role | Status |
 |---|---|---|
-| `backend/services/pipeline_service.py` | ThreadPoolExecutor bridge: `launch_pipeline` and `launch_regeneration` run sync orchestrator in a thread; thread-safe `Queue` drains status updates to Supabase without blocking the event loop. `save_image` persists uploads to Supabase Storage or filesystem. | Done — 2026-05-03 |
+| `backend/services/pipeline_service.py` | ThreadPoolExecutor bridge: `launch_pipeline` and `launch_regeneration` run sync orchestrator in a thread; passes `SERPER_API_KEY` to orchestrator; loads `serper_context.json` for manual regen; `serper_context` added to artifact list. `save_image` persists uploads to Supabase Storage or filesystem. | Done — updated 2026-05-03 |
 | `backend/tests/__init__.py` | Package marker | Done |
-| `backend/tests/test_pipeline_service.py` | 3 backend invariant tests (no Supabase, no Gemini required) — all passing | Done — 2026-05-03 |
+| `backend/tests/test_pipeline_service.py` | 3 backend invariant tests (no Supabase, no OpenAI key required) — all passing | Done — 2026-05-03 |
+| `backend/tests/test_serper_agent.py` | 9 Serper agent tests: blank key skip, timeout skip, 401 skip, 429 skip, bad JSON skip, PAA parse, pipeline-continues-on-skip, output format unchanged when skipped, review prompt omits check 9 when skipped | Done — 2026-05-03 |
 
 **Changes to existing files:**
 - `backend/routers/runs.py` — `POST /api/v1/runs` now fires `launch_pipeline` as a `BackgroundTask`; added `POST /runs/:id/regenerate` (targeted section regen) and `POST /runs/:id/images` (file upload)
@@ -162,7 +167,7 @@ FastAPI (async) → BackgroundTask → launch_pipeline (async)
         └── loop.run_in_executor(None, status_q.get) → update_run_status()
 ```
 
-**Test results:** `7 passed in 2.17s` — no Supabase or Gemini API key required.
+**Test results:** `7 passed in 2.17s` — no Supabase or OpenAI API key required.
 
 ### Backend — FastAPI (Phase 1)
 
@@ -171,14 +176,14 @@ Located at `backend/`. Run with `uvicorn backend.main:app --reload`. Requires no
 | File | Role | Status |
 |---|---|---|
 | `backend/main.py` | FastAPI app, CORS middleware, `/health` endpoint | Done — 2026-05-02 |
-| `backend/config.py` | `pydantic-settings`: `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `ALLOWED_ORIGINS` | Done |
+| `backend/config.py` | `pydantic-settings`: `OPENAI_API_KEY`, OpenAI model overrides, `SERPER_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `ALLOWED_ORIGINS` | Done — updated 2026-05-03 |
 | `backend/dependencies.py` | `get_current_user`: Supabase JWT validation; dev passthrough when Supabase not configured | Done |
 | `backend/routers/runs.py` | `POST /api/v1/runs`, `GET /api/v1/runs/:id`, `PATCH /api/v1/runs/:id/fields` | Done |
 | `backend/services/supabase_service.py` | `supabase_write_with_retry()` — 3-attempt retry + filesystem fallback; `insert_run`, `update_run_status`, `write_artifact`, `get_run_with_artifacts`, `resolve_field` | Done |
 | `supabase/migrations/001_initial_schema.sql` | `runs`, `run_artifacts`, `run_images`, `listings` tables + RLS on all 4 + `updated_at` trigger | Done |
 | `.github/workflows/keep-warm.yml` | Cron ping `/health` every 14 min — prevents Render free-tier cold starts | Done |
 | `tests/__init__.py` | Package marker | Done |
-| `tests/test_cli.py` | 4 pipeline invariant tests (no Supabase, no Gemini API required) — all passing | Done |
+| `tests/test_cli.py` | 4 pipeline invariant tests (no Supabase or OpenAI API key required) — all passing | Done |
 
 **Dev mode behaviour:** If `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` are blank, the app runs without a database. `insert_run` writes a JSON file to `listings/{run_id}/runs_write.json`. `get_run_with_artifacts` reads from `listings/{run_id}/`. All endpoints respond normally.
 
@@ -193,6 +198,7 @@ Located at `backend/`. Run with `uvicorn backend.main:app --reload`. Requires no
 | Path | Purpose |
 |---|---|
 | `listings/{run_id}/intake.json` | Intake Agent output for this run |
+| `listings/{run_id}/serper_context.json` | Serper SEO research result (always written — `{skipped: true}` if key blank or call failed) |
 | `listings/{run_id}/listing.json` | Content Generator output |
 | `listings/{run_id}/verified_json_ld.json` | Template Engine output (schema.org JSON-LD) |
 | `listings/{run_id}/merged_listing.json` | Final merged listing (used by Review Agent) |
@@ -214,7 +220,7 @@ Located at `backend/`. Run with `uvicorn backend.main:app --reload`. Requires no
   └── No duplicate → continue
          │
          ▼
-[Agent 1: Intake Agent]           Model: Gemini 2.5 Flash | Temp: 0
+[Agent 1: Intake Agent]           Model: OpenAI gpt-4o-mini | Responses API JSON mode
   Two-pass ambiguity detection:
     Pass 1: Pre-screen raw input for obvious vagueness
     Pass 2: Flag ambiguities found during field extraction
@@ -229,8 +235,19 @@ Located at `backend/`. Run with `uvicorn backend.main:app --reload`. Requires no
          │                         Demo only: printed to console, not sent
          │
          ▼
-[Agent 2: Content Generator]      Model: Gemini 2.5 Flash | Temp: 0.7 (0.3 on regen)
-  Input: intake.json
+[Serper SEO Agent]                Google SERP research (graceful degrade — never blocks)
+  Input: intake.payload → LLM generates search query (temp 0)
+  API: https://google.serper.dev/search (X-API-KEY header)
+  Output: serper_context.json
+    ├── organic[]: top competitor titles + snippets
+    ├── paa[]: People Also Ask questions → FAQ seeds
+    └── related_searches[]: tag candidates
+  Failure modes → SerperContext(skipped=True): blank key, timeout, 401, 429, bad JSON
+  States: serper_in_progress → serper_complete | serper_skipped
+         │
+         ▼
+[Agent 2: Content Generator]      Model: OpenAI gpt-4o-mini | Responses API JSON mode
+  Input: intake.json + serper_context (when available)
   Output: listing.json
     ├── listing: title (primary + A/B), tagline, description (short + full 4 sections),
     │           highlights (6), inclusions, exclusions, FAQs (7-8), SEO (title/meta/tags)
@@ -256,12 +273,13 @@ Located at `backend/`. Run with `uvicorn backend.main:app --reload`. Requires no
     + structured_data.canonical_strategy (built from variants: first=self-canonical, rest=canonical-to-primary)
          │
          ▼
-[Agent 3: Review Agent]           Model: Gemini 2.5 Flash | Temp: 0
+[Agent 3: Review Agent]           Model: OpenAI gpt-4o-mini | Responses API JSON mode
   Input: intake.json + merged_listing.json
   Three independent layers:
     Layer 1 — Factual accuracy (9 checks): every claim traces to intake data
     Layer 2 — Voice compliance (8 checks): Headout brand rules
-    Layer 3 — SEO completeness (8 checks): title/meta/tags/structured data
+    Layer 3 — SEO completeness (8 checks + check 9 conditional): title/meta/tags/structured data
+      Check 9 (conditional): if serper_context present and not skipped → primary keyword from organic[0] present in title?
   Output: review.json
     └── {overall: pass|conditional_pass|fail, scores, blockers, warnings,
           escalate_to_human, regeneration_scope}
@@ -291,10 +309,10 @@ Located at `backend/`. Run with `uvicorn backend.main:app --reload`. Requires no
 
 | Component | Type | Model | Temperature | Input | Output |
 |---|---|---|---|---|---|
-| Intake Agent | LLM | Gemini 2.5 Flash | 0 | Raw supplier text | `intake.json` |
-| Content Generator | LLM | Gemini 2.5 Flash | 0.7 (0.3 regen) | `intake.json` | `listing.json` |
+| Intake Agent | LLM | OpenAI `gpt-4o-mini` | Reasoning low; JSON mode | Raw supplier text | `intake.json` |
+| Content Generator | LLM | OpenAI `gpt-4o-mini` | Reasoning low; JSON mode | `intake.json` | `listing.json` |
 | Template Engine | Deterministic Python | — | — | `intake.json` | `verified_json_ld.json` |
-| Review Agent | LLM | Gemini 2.5 Flash | 0 | `intake.json` + `merged_listing.json` | `review.json` |
+| Review Agent | LLM | OpenAI `gpt-4o-mini` | Reasoning low; JSON mode | `intake.json` + `merged_listing.json` | `review.json` |
 | Duplicate Detector | Python (difflib) | — | — | `intake.payload` + `listings/` dir | similarity list |
 | Email Generator | Python (template) | — | — | `ambiguity_flags[]` | email draft string |
 
@@ -306,7 +324,10 @@ Located at `backend/`. Run with `uvicorn backend.main:app --reload`. Requires no
 pending
   → intake_in_progress
   → intake_complete
-  → generation_in_progress      (Content Generator + Template Engine — sequential in demo)
+  → serper_in_progress          (Serper SERP research — always runs)
+  → serper_complete             (Serper call succeeded)
+  → serper_skipped              (blank key, timeout, 401, 429, bad JSON — pipeline continues)
+  → generation_in_progress      (Content Generator + Template Engine — parallel)
   → generation_complete
   → review_in_progress
   → ready_for_publish           (pass or conditional_pass)
@@ -443,15 +464,17 @@ All 6 screens built, verified in browser, production build passing. See "Fronten
 | Login screen | ✅ Done (Session 9) | `LoginScreen.tsx` — Supabase Auth email/password |
 | Error boundaries on every screen | ✅ Done (Session 9) | `ErrorBoundary` wraps all screens in `App.tsx` |
 | Frontend API wiring (all 6 screens) | ✅ Done (Session 9) | Upload, Processing, Dashboard, Review wired to real API |
-| Full deploy | ⬜ Next | Render (backend) + Vercel (frontend) with env vars |
+| Frontend deploy — Vercel | ✅ Done (Session 12) | https://headout-listing-agent.vercel.app — `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` set; `VITE_API_URL` pending Render URL |
+| Backend deploy — Render | ⬜ Next | Set env vars: `OPENAI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `ALLOWED_ORIGINS`=Vercel URL; then update `VITE_API_URL` on Vercel |
+| Supabase migration — production | ⬜ Next | Run `supabase/migrations/001_initial_schema.sql` against production project |
 
 ### Ongoing (not blocking)
 
 | Component | Priority | Notes |
 |---|---|---|
 | Tests: 4 CLI invariants | High | CONTRADICTED halt, regen immutability, CONDITIONAL blocks_publish, null≠[] |
-| Error handling for API timeouts | High | Gemini `DeadlineExceeded` → `generation_blocked` state (Phase 2) |
-| Prompt caching | Medium | Gemini `cachedContent` API can cache large system prompts |
+| Error handling for API timeouts | High | OpenAI SDK exceptions → `generation_blocked` state (Phase 2) |
+| Prompt caching | Medium | Evaluate Responses API prompt caching once traffic patterns are clearer |
 | Rosetta integration | Post-MVP | Trigger after `ready_for_publish`; requires Headout internal API access |
 
 ---
@@ -460,12 +483,13 @@ All 6 screens built, verified in browser, production build passing. See "Fronten
 
 ```json
 {
-  "model": "gemini-2.5-flash",
-  "temperature": {
-    "intake": 0,
-    "content_generator": 0.7,
-    "content_generator_regen": 0.3,
-    "review": 0
+  "model": "gpt-4o-mini",
+  "api": "OpenAI Responses API",
+  "reasoning": {
+    "intake": "low",
+    "content_generator": "low",
+    "content_generator_regen": "low",
+    "review": "low"
   },
   "timeouts_ms": {
     "intake": 60000,
@@ -487,6 +511,85 @@ All 6 screens built, verified in browser, production build passing. See "Fronten
 ---
 
 ## Session History
+
+### Session 13 — Serper API SEO Integration (2026-05-03)
+
+Added Google SERP intelligence as a pre-generation step. PAA questions seed FAQs, competitor titles inform A/B variant structure, and related searches supplement the tags array. All Serper failures degrade gracefully — pipeline always continues.
+
+**Files created:**
+- `models/serper.py` — `SerperContext`, `SerperOrganic` Pydantic models
+- `agents/serper_agent.py` — LLM query gen (temp 0) + Serper API call + graceful degrade on all failure modes (blank key, timeout, 401, 429, bad JSON) → always returns `SerperContext`
+- `backend/tests/test_serper_agent.py` — 9 tests covering all skip paths + happy path
+
+**Files modified:**
+- `models/listing.py` — `paa_source: Optional[str] = None` added to `FAQ` (backwards compatible)
+- `models/__init__.py` — `SerperContext`, `SerperOrganic` exported
+- `orchestrator.py` — 3 new states (`serper_in_progress`, `serper_complete`, `serper_skipped`); `serper_context` field on `PipelineRun`; serper step inserted between intake and generation; `serper_context.json` artifact always saved; `serper_context` passed to `content_generator.run()`, `review_agent.run()`, and `run_targeted_regen()`
+- `agents/content_generator.py` — `serper_context` param on `run()` and `run_targeted_regen()`; builds "SEO Research Context" section in user prompt when serper not skipped
+- `agents/review_agent.py` — `serper_context` param; injects keyword signal or skip note into review prompt
+- `agent_prompt_content_generator.md` — "SEO Research Context" section: PAA → FAQ seeds with `paa_source`, competitor titles → A/B variant structural inspiration, related searches → tag candidates; prompt injection guard
+- `agent_prompt_review.md` — Layer 3 check 3.9 (conditional): primary keyword from organic[0] present in title? Warning only, not a blocker
+- `frontend/src/types.ts` — `serper_in_progress | serper_complete | serper_skipped` added to `RunStatus`
+- `frontend/src/pages/ProcessingScreen.tsx` — stage 2 renamed to "Researching search landscape"; 4 new context lines for serper states
+- `frontend/src/lib/mapRunToReviewData.ts` — per-FAQ `paa_source` citation: `source` field shows `Google users also ask: "..."` when present
+- `backend/config.py` — `SERPER_API_KEY: str = ""`
+- `backend/services/pipeline_service.py` — passes `settings.SERPER_API_KEY` to orchestrator; loads `serper_context.json` for associate-triggered regen; `serper_context.json` added to `_ARTIFACT_FILES`
+- `.env.example` — `SERPER_API_KEY=` placeholder added
+- `.env` — `SERPER_API_KEY` set (live key)
+
+**Key design decisions:**
+- `serper_context.json` always written — `{skipped: true, reason: "..."}` on any failure mode, so downstream can always load it without branching
+- `SERPER_API_KEY` blank = auto-skip — existing deploys without the key keep working unchanged
+- Content Generator treats `serper_context` as external/untrusted data — prompt injection guard prevents SERP content from issuing instructions
+- PAA citation flows end-to-end: LLM outputs `paa_source` per FAQ → stored in `FAQ` model → mapper reads it → Review Screen source popover shows the Google question it came from
+
+**Test results:** `16 passed in 2.85s` (7 existing + 9 new — no API key required)
+
+---
+
+### Session 12 — Pipeline Verification + Vercel Deploy (2026-05-03)
+
+Confirmed full end-to-end pipeline execution with OpenAI, fixed three gpt-4o-mini compatibility issues, and deployed the frontend to Vercel.
+
+**Model name fix:**
+- `gpt-5-mini` was a non-existent placeholder; OpenAI silently routed it to `gpt-4o-mini`. Corrected explicitly in `.env`, `.env.example`, and `agents/llm_client.py`.
+
+**Pipeline fixes (gpt-4o-mini output variance):**
+- `agent_prompt_content_generator.md` — Hard-stop condition rewritten to reference `_meta.publish_blocked` explicitly, not individual `ambiguity_flags[*].blocks_publish`. Added IMPORTANT callout that flag-level `blocks_publish` is not a generation stop signal. Added it to the "Do NOT stop for" list. Root cause: `gpt-4o-mini` saw `blocks_publish: true` in a flag and returned an error JSON despite the prompt saying "Do NOT stop for CONDITIONAL inclusions".
+- `models/listing.py` — Added `_coerce_str_to_list()` helper and `field_validator(mode="before")` on all `list[str]` fields across `KnowBeforeYouGo`, `SEO`, `Listing`, `Variant`, and `PublishVerdict`. Root cause: `gpt-4o-mini` occasionally returns a bare string instead of a single-item list.
+- `models/listing.py` — `CopyQualityScore` fields defaulted to `""` (were required); `publish_verdict.copy_quality_score` made optional with `default_factory=CopyQualityScore`. Root cause: model omits the scoring block when content budget runs close.
+
+**Pipeline verification:**
+- Happy path demo runs end-to-end: Intake → Content Generator → Template Engine → Review Agent → escalation (correct — CONDITIONAL flag with no remedy policy triggers human review by design).
+- Contradiction demo runs end-to-end: Review Agent correctly catches pickup time conflict (3:30 PM vs 4:00 PM) and escalates.
+- 7/7 tests still passing.
+
+**Vercel deploy:**
+- No official Vercel MCP exists (`@vercel/mcp-server` returns 404). Used Vercel CLI directly.
+- Project `headout-listing-agent` created under `ihazs-projects`. `ihaz.xyz` untouched.
+- `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (anon key, not service key) set in Vercel production env.
+- `VITE_API_URL` not yet set — will point to Render URL once backend is deployed.
+- **Live URL**: https://headout-listing-agent.vercel.app
+
+---
+
+### Session 11 — OpenAI API Migration (2026-05-03)
+
+Migrated the active LLM integration from Gemini to OpenAI.
+
+**Backend and agent changes:**
+- `requirements.txt` — replaced `google-genai` with the official `openai` Python SDK.
+- `agents/llm_client.py` — added a shared Responses API JSON helper with `OPENAI_MODEL` plus per-agent overrides.
+- `agents/intake_agent.py`, `agents/content_generator.py`, `agents/review_agent.py` — swapped Gemini calls for OpenAI Responses API calls while preserving the existing two-attempt JSON retry and Pydantic validation flow.
+- `generate_listing.py`, `backend/services/pipeline_service.py`, `backend/config.py` — now read `OPENAI_API_KEY`, support model overrides, and construct `OpenAI(...)`.
+
+**Model decision:**
+- Defaulted to `gpt-5-mini`, not a frontier/heavy model, because the tasks are structured extraction, controlled copy generation, and independent review.
+- MCP is not needed for the core pipeline right now; the app already owns orchestration and deterministic tools. It can be added later if agents need external tool/data access.
+
+**Tests/docs:**
+- Updated API-key docs, model references in `product_overview.md`, prompt headers, and backend tests.
+- Test suite remains API-free through mocks.
 
 ### Session 10 — Login Visual Refresh (2026-05-03)
 
@@ -606,7 +709,7 @@ Wired the synchronous orchestrator into FastAPI's async background task system, 
 - `orchestrator.py` — added `run_id` + `status_callback` params; `_notify()` helper; Content Generator + Template Engine now parallel via `ThreadPoolExecutor(max_workers=2)`
 - `backend/routers/runs.py` — `POST /runs` fires `launch_pipeline` as `BackgroundTask`; added `POST /runs/:id/regenerate` and `POST /runs/:id/images`
 
-**Test results:** `7 passed in 2.17s`
+**Test results:** `7 passed in 2.17s` (pre-Serper baseline)
 
 **Sync/async constraint respected:** orchestrator is sync; no async callbacks injected into threads. Queue-based pattern per `cto_instructions.md` Section 4.
 
