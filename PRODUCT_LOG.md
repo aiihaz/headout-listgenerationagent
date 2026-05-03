@@ -1,8 +1,8 @@
 # Headout AI Listing Generation Pipeline — Product Log
 
 > **Working directory**: `/Users/ihaz/Projects/list generation agent/`
-> **Last updated**: 2026-05-04 (Session 16)
-> **Status**: CLI pipeline complete and **verified end-to-end with OpenAI**. Frontend complete (all 6 screens, wired to real API, **deployed to Vercel**). Backend complete (Phases 1–2), **deployed to Render**. Full production stack live. Two performance fixes applied: login image 94% smaller (WebP) with preload + opacity fade-in; dashboard has localStorage stale-while-revalidate for instant repeat loads + skeleton UI. **Frontend: https://headout-listing-agent.vercel.app | Backend: https://headout-listgenerationagent.onrender.com**
+> **Last updated**: 2026-05-04 (Session 17)
+> **Status**: CLI pipeline complete and **verified end-to-end with OpenAI**. Frontend complete (all 6 screens, wired to real API, **deployed to Vercel**). Backend complete (Phases 1–2), **deployed to Render**. Full production stack live. URL routing overhauled (react-router-dom, `/listings/:id/` scheme, Vercel SPA rewrite). TopNav logout dropdown added. **Frontend: https://headout-listing-agent.vercel.app | Backend: https://headout-listgenerationagent.onrender.com**
 > **Repo**: https://github.com/aiihaz/headout-listgenerationagent (default branch: `staging`)
 
 ---
@@ -511,6 +511,61 @@ All 6 screens built, verified in browser, production build passing. See "Fronten
 ---
 
 ## Session History
+
+### Session 17 — URL Routing + Logout (2026-05-04)
+
+Two improvements: replaced the state-machine screen system with real URL routing, and added a logout dropdown to the TopNav.
+
+**URL routing — react-router-dom v6**
+
+Root cause: the entire app was a `useState<Screen>` state machine in `App.tsx`. Every screen transition was `go('review')` — no URL ever changed, so bookmarks, back/forward, and page refresh were all broken. Refreshing any non-root URL returned a Vercel 404.
+
+Changes:
+- Installed `react-router-dom` v6 (`BrowserRouter`, `Routes`, `Route`, `useNavigate`, `useParams`, `useLocation`)
+- `frontend/src/main.tsx` — wrapped `<App />` in `<BrowserRouter>`
+- `frontend/src/App.tsx` — replaced `useState<Screen>` + `go()` with `<Routes>`/`<Route>`. Auth check stays at the top level. An `AppShell` sub-component reads `useLocation` to decide whether to show "Saved" in TopNav
+- URL scheme follows the `/listings/:id/slug` pattern used by top travel OTAs:
+  - `/dashboard`
+  - `/new`
+  - `/listings/:id/processing`
+  - `/listings/:id/review`
+  - `/listings/:id/publish`
+  - `/listings/:id/published`
+- All page components (`Dashboard`, `UploadScreen`, `ProcessingScreen`, `ReviewScreen`, `PublishConfirm`, `PublishedScreen`) had props-based callbacks removed; each navigates independently via `useNavigate`
+- `UploadScreen` passes `expName` to `ProcessingScreen` via router location state (`navigate(path, { state: { expName } })`) — no URL clutter, no global store
+- Dashboard row click is status-aware: `Processing` rows go to `/processing` (polling screen); all others go to `/review`
+- Removed `Screen` type and `ProcessData` interface from `types.ts` — replaced by URL params + location state
+- `frontend/vercel.json` — SPA rewrite rule added (`"source": "/((?!api/).*)"` → `/index.html`) so direct URL access and page refresh don't 404. Must be in `frontend/` (Vercel Root Directory), not repo root
+
+**Dependency gaps fixed before shipping:**
+1. `vercel.json` copied into `frontend/` — without this, any bookmarked URL would 404 on Vercel
+2. Dashboard routing made status-aware — Processing runs must go to the polling screen, not the review screen
+3. URL param renamed `:runId` → `:id`; components use alias `const { id: runId } = useParams<{ id: string }>()`
+
+**Logout dropdown — TopNav**
+
+Added a click-to-toggle dropdown anchored to the avatar "IH" pill in the top-right:
+- Click avatar → dropdown opens with a purple outline ring on the avatar; click avatar again or anywhere outside to close
+- Dropdown shows user name ("Ihaz I.") and role label ("Listing Agent") at the top
+- "Sign out" row with `LogOut` icon calls `signOut()` from `supabase.ts`; Supabase's `onAuthStateChange` in `App.tsx` handles the redirect back to the login screen
+- Click-outside handled via `mousedown` listener attached only while the dropdown is open (no permanent listener)
+- Matches existing token system: `--border`, `--ink60`, `--purps`, `--dreamy`, `--slate`
+
+**Files modified:**
+- `frontend/src/main.tsx` — `BrowserRouter` wrapper
+- `frontend/src/App.tsx` — full rewrite: `<Routes>`/`<Route>`, auth check, `AppShell` + `useAutoSave`
+- `frontend/src/types.ts` — removed `Screen`, `ProcessData`
+- `frontend/src/pages/Dashboard.tsx` — `useNavigate`, status-aware row click
+- `frontend/src/pages/UploadScreen.tsx` — `useNavigate`, navigate with `expName` state
+- `frontend/src/pages/ProcessingScreen.tsx` — `useParams`, `useNavigate`, `useLocation` for `expName`
+- `frontend/src/pages/ReviewScreen.tsx` — `useParams`, `useNavigate`
+- `frontend/src/pages/PublishConfirm.tsx` — `useParams`, `useNavigate`
+- `frontend/src/pages/PublishedScreen.tsx` — `useNavigate`
+- `frontend/src/components/TopNav.tsx` — logout dropdown with click-outside, `signOut()` integration
+- `frontend/vercel.json` — SPA rewrite rule (new file)
+- `frontend/package.json` / `package-lock.json` — `react-router-dom` added
+
+---
 
 ### Session 16 — Performance Fixes: Login Image + Dashboard Load (2026-05-04)
 
