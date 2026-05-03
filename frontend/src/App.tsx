@@ -28,10 +28,10 @@ function AppShell() {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/new" element={<UploadScreen />} />
-            <Route path="/listings/:runId/processing" element={<ProcessingScreen />} />
-            <Route path="/listings/:runId/review" element={<ReviewScreen />} />
-            <Route path="/listings/:runId/publish" element={<PublishConfirm />} />
-            <Route path="/listings/:runId/published" element={<PublishedScreen />} />
+            <Route path="/listings/:id/processing" element={<ProcessingScreen />} />
+            <Route path="/listings/:id/review" element={<ReviewScreen />} />
+            <Route path="/listings/:id/publish" element={<PublishConfirm />} />
+            <Route path="/listings/:id/published" element={<PublishedScreen />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </ErrorBoundary>

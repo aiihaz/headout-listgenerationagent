@@ -116,7 +116,7 @@ function countFlags(data: ReviewData): number {
 }
 
 export function ReviewScreen() {
-  const { runId } = useParams<{ runId: string }>();
+  const { id: runId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const onPublish = () => navigate(`/listings/${runId}/publish`);
   const onBack = () => navigate('/dashboard');

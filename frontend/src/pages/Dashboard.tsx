@@ -193,7 +193,7 @@ export function Dashboard() {
                 return (
                   <tr
                     key={l.id}
-                    onClick={() => navigate(`/listings/${l.runId}/review`)}
+                    onClick={() => navigate(`/listings/${l.runId}/${l.status === 'Processing' ? 'processing' : 'review'}`)}
                     style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--border)' : 'none', cursor: 'pointer', transition: 'background 120ms' }}
                     onMouseEnter={e => (e.currentTarget.style.background = '#FAFAFA')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}

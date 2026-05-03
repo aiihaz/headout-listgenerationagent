@@ -44,7 +44,7 @@ function statusToContextLine(status: RunStatus, error?: string | null): string {
 }
 
 export function ProcessingScreen() {
-  const { runId } = useParams<{ runId: string }>();
+  const { id: runId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { state } = useLocation();
   const expName: string | undefined = (state as { expName?: string } | null)?.expName;

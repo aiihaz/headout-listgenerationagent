@@ -9,7 +9,7 @@ const CHECKLIST = [
 ];
 
 export function PublishConfirm() {
-  const { runId } = useParams<{ runId: string }>();
+  const { id: runId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const onConfirm = () => navigate(`/listings/${runId}/published`);
   const onEdit = () => navigate(`/listings/${runId}/review`);
