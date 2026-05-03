@@ -33,8 +33,8 @@ export type RunStatus =
   | 'generation_blocked'
   | 'unknown';
 
-export const TERMINAL_OK: RunStatus[] = ['ready_for_publish', 'approved', 'published'];
-export const TERMINAL_FAIL: RunStatus[] = ['intake_failed', 'generation_blocked', 'escalated_to_human'];
+export const TERMINAL_OK: RunStatus[] = ['ready_for_publish', 'approved', 'published', 'escalated_to_human'];
+export const TERMINAL_FAIL: RunStatus[] = ['intake_failed', 'generation_blocked'];
 
 export function runStatusToListingStatus(s: RunStatus): ListingStatus {
   if (s === 'published' || s === 'approved') return 'Published';
