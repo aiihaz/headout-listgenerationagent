@@ -4,7 +4,9 @@ import {
   ArrowRight, X, Check, Plus, FileText, ExternalLink,
 } from 'lucide-react';
 import { FieldComponent } from '../components/FieldComponent';
-import type { FieldData, FieldStatus } from '../types';
+import { api } from '../lib/api';
+import { mapRunToReviewData } from '../lib/mapRunToReviewData';
+import type { FieldData, FieldStatus, ReviewData } from '../types';
 
 const REVIEW_DATA = {
   title: {
@@ -107,12 +109,52 @@ function SupplierMessageField(_: SupplierMessageFieldProps) {
 interface ReviewScreenProps {
   onPublish: () => void;
   onBack: () => void;
+  runId?: string;
   showSourceQuotes?: boolean;
 }
 
-export function ReviewScreen({ onPublish, onBack, showSourceQuotes = true }: ReviewScreenProps) {
+function countFlags(data: ReviewData): number {
+  const allFields = [
+    data.title, data.descHook, ...data.highlights, ...data.inclusions,
+    ...data.exclusions, ...data.faqs, data.cancellation, data.seoNote,
+  ];
+  return allFields.filter(f => f.status === 'review' || f.status === 'caveat').length;
+}
+
+export function ReviewScreen({ onPublish, onBack, runId, showSourceQuotes = true }: ReviewScreenProps) {
+  const [reviewData, setReviewData] = useState<ReviewData>(
+    // cast: REVIEW_DATA uses satisfies which doesn't widen to ReviewData — use mock directly
+    {
+      title: REVIEW_DATA.title,
+      descHook: REVIEW_DATA.descHook,
+      highlights: REVIEW_DATA.highlights,
+      inclusions: REVIEW_DATA.inclusions,
+      exclusions: REVIEW_DATA.exclusions,
+      faqs: REVIEW_DATA.faqs,
+      cancellation: REVIEW_DATA.cancellation,
+      seoNote: REVIEW_DATA.seoNote,
+    } satisfies ReviewData
+  );
   const [flags, setFlags] = useState(TOTAL_FLAGS);
+  const [loadingRun, setLoadingRun] = useState(!!runId);
   const [resolvedSections, setResolvedSections] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!runId) return;
+    setLoadingRun(true);
+    api.getRun(runId).then(run => {
+      const merged = run.artifacts?.merged_listing as Record<string, unknown> | undefined;
+      if (merged) {
+        // Attach review blockers/warnings from review artifact if present
+        const reviewArtifact = run.artifacts?.review as Record<string, unknown> | undefined;
+        const data = mapRunToReviewData({ ...merged, review: reviewArtifact?.review });
+        setReviewData(data);
+        setFlags(countFlags(data));
+      }
+    }).catch(() => {
+      // Keep mock data on error — screen still usable
+    }).finally(() => setLoadingRun(false));
+  }, [runId]);
   const [activeSection, setActiveSection] = useState('s-title');
   const [bannerExpanded, setBannerExpanded] = useState(false);
   const [supplierModalOpen, setSupplierModalOpen] = useState(false);
@@ -124,16 +166,20 @@ export function ReviewScreen({ onPublish, onBack, showSourceQuotes = true }: Rev
     setResolvedSections(prev => ({ ...prev, [sectionId]: (prev[sectionId] || 0) + 1 }));
   };
 
+  function resolvedOrActual(sectionId: string, actual: FieldStatus, resolveThreshold = 1): FieldStatus {
+    return resolvedSections[sectionId] >= resolveThreshold ? 'ready' : actual;
+  }
+
   const navSections = [
-    { id: 's-title', label: 'Title', status: 'ready' as FieldStatus },
-    { id: 's-desc', label: 'Description', status: (resolvedSections['s-desc'] >= 1 ? 'ready' : 'caveat') as FieldStatus },
-    { id: 's-highlights', label: 'Highlights', status: (resolvedSections['s-highlights'] >= 1 ? 'ready' : 'caveat') as FieldStatus },
-    { id: 's-inclusions', label: 'Inclusions', status: (resolvedSections['s-inclusions'] >= 1 ? 'ready' : 'review') as FieldStatus },
-    { id: 's-exclusions', label: 'Exclusions', status: 'ready' as FieldStatus },
+    { id: 's-title', label: 'Title', status: resolvedOrActual('s-title', reviewData.title.status) },
+    { id: 's-desc', label: 'Description', status: resolvedOrActual('s-desc', reviewData.descHook.status) },
+    { id: 's-highlights', label: 'Highlights', status: resolvedOrActual('s-highlights', reviewData.highlights.find(h => h.status !== 'ready')?.status ?? 'ready') },
+    { id: 's-inclusions', label: 'Inclusions', status: resolvedOrActual('s-inclusions', reviewData.inclusions.find(i => i.status !== 'ready')?.status ?? 'ready') },
+    { id: 's-exclusions', label: 'Exclusions', status: resolvedOrActual('s-exclusions', reviewData.exclusions.find(e => e.status !== 'ready')?.status ?? 'ready') },
     { id: 's-module-hours', label: 'Operating hours', status: 'ready' as FieldStatus },
-    { id: 's-faqs', label: 'FAQs', status: (resolvedSections['s-faqs'] >= 2 ? 'ready' : 'review') as FieldStatus },
-    { id: 's-seo', label: 'SEO tags', status: 'ready' as FieldStatus },
-    { id: 's-cancel', label: 'Cancellation', status: 'ready' as FieldStatus },
+    { id: 's-faqs', label: 'FAQs', status: resolvedOrActual('s-faqs', reviewData.faqs.find(f => f.status !== 'ready')?.status ?? 'ready', 2) },
+    { id: 's-seo', label: 'SEO tags', status: resolvedOrActual('s-seo', reviewData.seoNote.status) },
+    { id: 's-cancel', label: 'Cancellation', status: resolvedOrActual('s-cancel', reviewData.cancellation.status) },
   ];
 
   const scrollTo = (id: string) => {
@@ -168,6 +214,14 @@ export function ReviewScreen({ onPublish, onBack, showSourceQuotes = true }: Rev
   }, []);
 
   const verdictReady = flags === 0;
+
+  if (loadingRun) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--ink60)', fontSize: 14 }}>
+        Loading listing…
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -391,29 +445,29 @@ export function ReviewScreen({ onPublish, onBack, showSourceQuotes = true }: Rev
       {/* Main column */}
       <div ref={mainRef} style={{ flex: 1, overflow: 'auto', padding: '20px 28px' }}>
         <Section id="s-title">
-          <FieldComponent field={REVIEW_DATA.title} showSource={showSourceQuotes} />
+          <FieldComponent field={reviewData.title} showSource={showSourceQuotes} />
         </Section>
 
         <Section id="s-desc">
-          <FieldComponent field={REVIEW_DATA.descHook} showSource={showSourceQuotes} onResolve={() => markSectionResolved('s-desc')} />
+          <FieldComponent field={reviewData.descHook} showSource={showSourceQuotes} onResolve={() => markSectionResolved('s-desc')} />
         </Section>
 
         <Section id="s-highlights">
-          {REVIEW_DATA.highlights.map(h => (
+          {reviewData.highlights.map(h => (
             <FieldComponent key={h.id} field={h} showSource={showSourceQuotes}
               onResolve={h.status === 'caveat' ? () => markSectionResolved('s-highlights') : undefined} />
           ))}
         </Section>
 
         <Section id="s-inclusions">
-          {REVIEW_DATA.inclusions.map(h => (
+          {reviewData.inclusions.map(h => (
             <FieldComponent key={h.id} field={h} showSource={showSourceQuotes}
               onResolve={h.status === 'review' ? () => markSectionResolved('s-inclusions') : undefined} />
           ))}
         </Section>
 
         <Section id="s-exclusions">
-          {REVIEW_DATA.exclusions.map(h => (
+          {reviewData.exclusions.map(h => (
             <FieldComponent key={h.id} field={h} showSource={showSourceQuotes} />
           ))}
         </Section>
@@ -451,18 +505,18 @@ export function ReviewScreen({ onPublish, onBack, showSourceQuotes = true }: Rev
         </Section>
 
         <Section id="s-faqs">
-          {REVIEW_DATA.faqs.map(f => (
+          {reviewData.faqs.map(f => (
             <FieldComponent key={f.id} field={f} showSource={showSourceQuotes}
               onResolve={f.status === 'review' ? () => markSectionResolved('s-faqs') : undefined} />
           ))}
         </Section>
 
         <Section id="s-seo">
-          <FieldComponent field={REVIEW_DATA.seoNote} showSource={showSourceQuotes} />
+          <FieldComponent field={reviewData.seoNote} showSource={showSourceQuotes} />
         </Section>
 
         <Section id="s-cancel">
-          <FieldComponent field={REVIEW_DATA.cancellation} showSource={showSourceQuotes} />
+          <FieldComponent field={reviewData.cancellation} showSource={showSourceQuotes} />
         </Section>
 
         {/* Source files */}

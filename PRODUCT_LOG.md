@@ -1,8 +1,8 @@
 # Headout AI Listing Generation Pipeline — Product Log
 
 > **Working directory**: `/Users/ihaz/Projects/list generation agent/`
-> **Last updated**: 2026-05-03 (Session 8)
-> **Status**: CLI pipeline complete. Frontend complete (all 6 screens, verified in browser). **Phase 2 pipeline integration complete** — orchestrator wired into FastAPI background tasks, `/regenerate` and `/images` endpoints live, 7 tests passing. Supabase auth bypass fixed, template engine schema fully aligned to camelCase intake payload, all three agent prompts grounded in actual Headout API JSON examples. Phase 3 (connect frontend to real API) is next.
+> **Last updated**: 2026-05-03 (Session 9)
+> **Status**: CLI pipeline complete. Frontend complete (all 6 screens, **now wired to real API**). Backend complete (Phases 1–2). **Phase 4 API wiring complete** — all 6 screens connected to FastAPI; `GET /api/v1/runs` list endpoint added; Supabase Auth login screen added; `ErrorBoundary` component added; `@supabase/supabase-js` installed; `mapRunToReviewData` mapper bridges `merged_listing.json` → `FieldData[]`; `tsconfig.json` fixed for `import.meta.env`; pre-existing `start_times` → `startTimes` test bug fixed. 7 tests passing. Deploy (Phase 4 final) is next.
 > **Repo**: https://github.com/aiihaz/headout-listgenerationagent (default branch: `staging`)
 
 ---
@@ -424,24 +424,26 @@ All components built, 7 tests passing. See "Backend — FastAPI (Phase 2)" in th
 
 All 6 screens built, verified in browser, production build passing. See "Frontend — React + Vite + TypeScript" in the File Inventory above for full details.
 
-**Remaining frontend work (connects to real API — Phase 2 prerequisite):**
+**Remaining frontend work:**
 
-| Component | Notes |
-|---|---|
-| Replace mock data in Dashboard | Wire to `GET /api/v1/runs` once backend exists |
-| Replace mock data in ReviewScreen | Wire to `GET /api/v1/runs/:id/artifacts/merged_listing` |
-| Type codegen | `openapi-typescript` from FastAPI's `/openapi.json` → `src/lib/types.ts` (once backend exists) |
-| Supabase Realtime subscriptions | ProcessingScreen and ReviewScreen progress (Phase 2) |
-| Login screen | Supabase Auth email/password (Phase 4) |
-| `frontend/e2e/` Playwright tests | Happy path + CONTRADICTED + escalation UI (Phase 4) |
+| Component | Status | Notes |
+|---|---|---|
+| Replace mock data in Dashboard | ✅ Done (Session 9) | Wired to `GET /api/v1/runs` |
+| Replace mock data in ReviewScreen | ✅ Done (Session 9) | Wired to `GET /api/v1/runs/:id` + mapper |
+| Login screen | ✅ Done (Session 9) | Supabase Auth email/password |
+| Error boundaries | ✅ Done (Session 9) | `ErrorBoundary` component |
+| Type codegen | Deferred | `openapi-typescript` from FastAPI `/openapi.json` — can add when API stabilizes |
+| Supabase Realtime subscriptions | Deferred | ProcessingScreen uses polling (2.5s); Realtime is a Phase 4+ upgrade |
+| `frontend/e2e/` Playwright tests | Deferred | Happy path + CONTRADICTED + escalation UI — Phase 4+ |
 
-### Phase 4 — Auth + hardening + deploy (1–2 days)
+### Phase 4 — Auth + hardening + deploy
 
-| Component | Notes |
-|---|---|
-| Login screen | Supabase Auth (email/password) |
-| Error boundaries on every screen | Clear error states, Retry button for `generation_blocked` runs |
-| Full deploy | Render (backend) + Vercel (frontend) with env vars |
+| Component | Status | Notes |
+|---|---|---|
+| Login screen | ✅ Done (Session 9) | `LoginScreen.tsx` — Supabase Auth email/password |
+| Error boundaries on every screen | ✅ Done (Session 9) | `ErrorBoundary` wraps all screens in `App.tsx` |
+| Frontend API wiring (all 6 screens) | ✅ Done (Session 9) | Upload, Processing, Dashboard, Review wired to real API |
+| Full deploy | ⬜ Next | Render (backend) + Vercel (frontend) with env vars |
 
 ### Ongoing (not blocking)
 
@@ -485,6 +487,43 @@ All 6 screens built, verified in browser, production build passing. See "Fronten
 ---
 
 ## Session History
+
+### Session 9 — Frontend API Wiring + Auth (2026-05-03)
+
+Connected all 6 frontend screens to the real FastAPI backend, added Supabase Auth login, added an `ErrorBoundary` component, and fixed a pre-existing test field-name bug.
+
+**Backend additions:**
+- `backend/services/supabase_service.py` — added `list_runs()` (Supabase or filesystem) and `_filesystem_list_runs()` helper
+- `backend/routers/runs.py` — added `GET /api/v1/runs` list endpoint (returns up to 50 most recent runs)
+
+**Frontend packages:**
+- Installed `@supabase/supabase-js`
+- Added `"types": ["vite/client"]` to `tsconfig.json` (fixes `import.meta.env` TS error)
+
+**New frontend files:**
+- `frontend/src/lib/supabase.ts` — Supabase client init; `getSessionToken`, `signIn`, `signOut`; gracefully returns `null` when `VITE_SUPABASE_URL` is blank (dev mode)
+- `frontend/src/lib/api.ts` — typed fetch wrapper: `createRun`, `getRun`, `listRuns`, `patchField`, `regenerateSection`, `uploadImage`; reads `VITE_API_URL` (defaults to `http://localhost:8000`)
+- `frontend/src/lib/mapRunToReviewData.ts` — maps `merged_listing.json` → `ReviewData`; reads `listing.*`, `intake_payload.*`, review blockers/warnings for per-field status
+- `frontend/src/pages/LoginScreen.tsx` — Supabase Auth email/password form; `onLogin` callback on success
+- `frontend/src/components/ErrorBoundary.tsx` — React class error boundary; wraps entire screen area in `App.tsx`
+- `frontend/.env.example` — `VITE_API_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+
+**Modified frontend files:**
+- `frontend/src/types.ts` — added `RunStatus`, `TERMINAL_OK`, `TERMINAL_FAIL`, `runStatusToListingStatus`, `ApiRun`, `RunDetail`, `ReviewBlocker`, `ReviewWarning`, `RunArtifacts`; updated `Screen` (added `'login'`), `ListingRow` (id is now `string`, added `runId`), `ProcessData` (removed `files`, added `runId`)
+- `frontend/src/App.tsx` — Supabase auth state detection; shows `LoginScreen` when unauthenticated; skips auth check when Supabase not configured (dev bypass); `ErrorBoundary` wraps all screens; `onOpen` now passes `runId` not `ListingRow`
+- `frontend/src/pages/UploadScreen.tsx` — `handleProcess` calls `api.createRun(supplierInput)`; reads text/CSV files directly; returns `run_id` via `onProcess`; shows error below CTA on failure
+- `frontend/src/pages/ProcessingScreen.tsx` — polls `GET /api/v1/runs/{runId}` every 2.5s; maps `RunStatus` → stage index and context line; shows `AlertTriangle` failure card with "Back to dashboard" on terminal fail; falls back to timed demo if no `runId`
+- `frontend/src/pages/Dashboard.tsx` — fetches `GET /api/v1/runs` on mount; maps `ApiRun` → `ListingRow`; loading/error states with Retry; `onOpen` now passes `runId` string; Refresh button
+- `frontend/src/pages/ReviewScreen.tsx` — added `runId` prop; fetches `GET /api/v1/runs/{runId}` on mount; calls `mapRunToReviewData` to populate fields; loading state; nav section statuses derived from actual field statuses; falls back to mock data on error
+
+**Bug fix:**
+- `tests/test_cli.py` — `start_times` → `startTimes` in template engine null/empty/non-empty test (aligns with Session 8 camelCase schema change that the test missed)
+
+**Test results:** `7 passed in 1.56s` — no regressions.
+
+**Build:** `npm run build` passes, `tsc --noEmit` clean, 0 TypeScript errors.
+
+---
 
 ### Session 8 — Schema Alignment + Prompt Consistency Audit (2026-05-03)
 

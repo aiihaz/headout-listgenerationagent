@@ -48,6 +48,14 @@ async def create_run(
     return CreateRunResponse(run_id=run_id, status="pending")
 
 
+@router.get("/runs")
+async def list_runs(
+    limit: int = 50,
+    user: dict = Depends(get_current_user),
+) -> list[dict[str, Any]]:
+    return await supabase_service.list_runs(limit=limit)
+
+
 @router.get("/runs/{run_id}")
 async def get_run(
     run_id: str,

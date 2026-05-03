@@ -37,3 +37,4 @@ frontend/.vite/
 # Claude internal
 .claude/
 .playwright-mcp/
+.mcp.json

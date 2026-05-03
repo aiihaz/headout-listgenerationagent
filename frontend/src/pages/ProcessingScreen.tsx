@@ -1,59 +1,122 @@
 import { useState, useEffect, useRef } from 'react';
-import { Check, ArrowRight } from 'lucide-react';
+import { Check, ArrowRight, AlertTriangle } from 'lucide-react';
+import { api } from '../lib/api';
+import { TERMINAL_OK, TERMINAL_FAIL, type RunStatus } from '../types';
 
-const STAGES = [
-  'Reading supplier files',
-  'Extracting structured data',
-  'Detecting modules',
-  'Generating listing',
-  'Validating',
-  'Finalizing verdict',
+const STAGES: { label: string; statuses: RunStatus[] }[] = [
+  { label: 'Reading supplier files', statuses: ['pending', 'duplicate_check'] },
+  { label: 'Extracting structured data', statuses: ['intake_in_progress'] },
+  { label: 'Detecting modules', statuses: ['intake_complete'] },
+  { label: 'Generating listing', statuses: ['generation_in_progress', 'generation_complete'] },
+  { label: 'Validating', statuses: ['review_in_progress', 'regeneration_in_progress'] },
+  { label: 'Finalising verdict', statuses: ['ready_for_publish'] },
 ];
 
-const CONTEXT_LINES = [
-  'Found 2 files. Starting analysis…',
-  'Extracted 4,200 tokens from supplier PDF.',
-  'Detected modules: itinerary, operating hours, audio guide.',
-  'Generating title · description · highlights · FAQs…',
-  'Checking field completeness and confidence scores…',
-  'Verdict ready — 3 fields need review.',
-];
+function statusToStage(status: RunStatus): number {
+  for (let i = STAGES.length - 1; i >= 0; i--) {
+    if (STAGES[i].statuses.includes(status)) return i;
+  }
+  if (TERMINAL_OK.includes(status)) return STAGES.length;
+  return 0;
+}
+
+function statusToContextLine(status: RunStatus, error?: string | null): string {
+  if (error) return `Error: ${error}`;
+  const map: Partial<Record<RunStatus, string>> = {
+    pending: 'Queued for processing…',
+    duplicate_check: 'Checking for duplicate listings…',
+    intake_in_progress: 'Extracting fields from supplier data…',
+    intake_complete: 'Structured intake complete. Detecting modules…',
+    generation_in_progress: 'Generating title · description · highlights · FAQs…',
+    generation_complete: 'Copy generated. Running quality review…',
+    review_in_progress: 'Checking field completeness and voice compliance…',
+    regeneration_in_progress: 'Regenerating flagged fields…',
+    ready_for_publish: 'Verdict ready — proceed to review.',
+    intake_failed: 'Intake failed. Please check your input and try again.',
+    generation_blocked: 'Generation blocked. Pipeline could not complete.',
+    escalated_to_human: 'Escalated — a human review is required.',
+  };
+  return map[status] ?? 'Processing…';
+}
 
 interface ProcessingScreenProps {
   expName?: string;
+  runId?: string;
   onDone: () => void;
-  stageSpeed?: number;
-  autoAdvance?: boolean;
+  onError: () => void;
 }
 
-export function ProcessingScreen({ expName, onDone, stageSpeed = 900, autoAdvance = true }: ProcessingScreenProps) {
+export function ProcessingScreen({ expName, runId, onDone, onError }: ProcessingScreenProps) {
   const [stage, setStage] = useState(0);
-  const [contextLine, setContextLine] = useState(CONTEXT_LINES[0]);
+  const [contextLine, setContextLine] = useState('Queued for processing…');
+  const [failed, setFailed] = useState(false);
+  const [failMessage, setFailMessage] = useState('');
   const onDoneRef = useRef(onDone);
-  useEffect(() => { onDoneRef.current = onDone; }, [onDone]);
+  const onErrorRef = useRef(onError);
+  useEffect(() => { onDoneRef.current = onDone; onErrorRef.current = onError; }, [onDone, onError]);
 
   useEffect(() => {
-    setStage(0);
-    setContextLine(CONTEXT_LINES[0]);
+    if (!runId) {
+      // No real run — demo mode: animate through stages
+      setStage(0);
+      const timers = STAGES.map((_, i) =>
+        setTimeout(() => setStage(i + 1), 900 * (i + 1))
+      );
+      const doneTimer = setTimeout(() => onDoneRef.current(), 900 * (STAGES.length + 1) + 300);
+      return () => { timers.forEach(clearTimeout); clearTimeout(doneTimer); };
+    }
 
-    const timers = STAGES.map((_, i) =>
-      setTimeout(() => {
-        setStage(i + 1);
-        setContextLine(CONTEXT_LINES[i]);
-      }, stageSpeed * (i + 1))
-    );
+    let cancelled = false;
+    const poll = async () => {
+      while (!cancelled) {
+        try {
+          const run = await api.getRun(runId);
+          const status = run.status as RunStatus;
+          const s = statusToStage(status);
+          setStage(s);
+          setContextLine(statusToContextLine(status, run.error_message));
 
-    const doneTimer = autoAdvance
-      ? setTimeout(() => onDoneRef.current(), stageSpeed * (STAGES.length + 1) + 300)
-      : null;
-
-    return () => {
-      timers.forEach(clearTimeout);
-      if (doneTimer) clearTimeout(doneTimer);
+          if (TERMINAL_OK.includes(status)) {
+            if (!cancelled) onDoneRef.current();
+            return;
+          }
+          if (TERMINAL_FAIL.includes(status)) {
+            setFailed(true);
+            setFailMessage(run.error_message ?? status);
+            return;
+          }
+        } catch {
+          // transient network error — keep polling
+        }
+        await new Promise(r => setTimeout(r, 2500));
+      }
     };
-  }, [stageSpeed, autoAdvance]);
+    poll();
+    return () => { cancelled = true; };
+  }, [runId]);
 
   const pct = Math.round((stage / STAGES.length) * 100);
+
+  if (failed) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <div className="fade-in" style={{
+          width: 520, padding: 40, background: '#fff',
+          borderRadius: 16, boxShadow: '0 4px 24px rgba(0,0,0,0.09)', textAlign: 'center',
+        }}>
+          <AlertTriangle size={40} color="var(--red)" style={{ display: 'block', margin: '0 auto 16px' }} />
+          <p style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>Pipeline failed</p>
+          <p style={{ fontSize: 13, color: 'var(--ink60)', marginBottom: 24 }}>{failMessage}</p>
+          <button onClick={() => onErrorRef.current()} style={{
+            height: 38, padding: '0 24px', background: 'var(--purps)', color: '#fff',
+            border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+          }}>
+            Back to dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
@@ -66,7 +129,7 @@ export function ProcessingScreen({ expName, onDone, stageSpeed = 900, autoAdvanc
           <span style={{ fontWeight: 700, fontSize: 16 }}>Processing listing</span>
         </div>
         <p style={{ fontSize: 13, color: 'var(--ink60)', marginBottom: 24 }}>
-          {expName || 'Acropolis & Parthenon Tickets with Audio Guide'}
+          {expName || 'New listing'}
         </p>
 
         {/* Stages */}
@@ -75,7 +138,7 @@ export function ProcessingScreen({ expName, onDone, stageSpeed = 900, autoAdvanc
             const done = i < stage;
             const active = i === stage && stage < STAGES.length;
             return (
-              <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{
                   width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
                   border: done ? 'none' : active ? '2px solid var(--purps)' : '2px solid var(--border)',
@@ -94,7 +157,7 @@ export function ProcessingScreen({ expName, onDone, stageSpeed = 900, autoAdvanc
                   fontWeight: active ? 600 : 400,
                   color: done ? 'var(--slate)' : active ? 'var(--purps)' : 'var(--ink30)',
                 }}>
-                  {s}
+                  {s.label}
                 </span>
               </div>
             );
@@ -109,16 +172,16 @@ export function ProcessingScreen({ expName, onDone, stageSpeed = 900, autoAdvanc
           }} />
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: !autoAdvance ? 16 : 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <p style={{ fontSize: 12, color: 'var(--ink60)', fontStyle: 'italic' }}>{contextLine}</p>
           <span style={{ fontSize: 12, color: 'var(--purps)', fontWeight: 600 }}>{pct}%</span>
         </div>
 
-        {!autoAdvance && (
+        {stage >= STAGES.length && (
           <button
             onClick={() => onDoneRef.current()}
             style={{
-              width: '100%', height: 38, background: 'var(--purps)', color: '#fff',
+              marginTop: 16, width: '100%', height: 38, background: 'var(--purps)', color: '#fff',
               border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}

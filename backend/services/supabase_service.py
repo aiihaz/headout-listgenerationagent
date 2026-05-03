@@ -100,6 +100,25 @@ async def get_run_with_artifacts(run_id: str) -> Optional[dict[str, Any]]:
         return _filesystem_get_run(run_id)
 
 
+async def list_runs(limit: int = 50) -> list[dict[str, Any]]:
+    client = _get_client()
+    if client is None:
+        return _filesystem_list_runs(limit)
+
+    try:
+        resp = (
+            client.table("runs")
+            .select("id,status,supplier_input,created_at,updated_at,error_message")
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return resp.data or []
+    except Exception as exc:
+        logger.error("list_runs failed: %s", exc)
+        return _filesystem_list_runs(limit)
+
+
 async def resolve_field(
     run_id: str, field_path: str, resolved_value: Any
 ) -> bool:
@@ -115,6 +134,35 @@ async def resolve_field(
         return bool(resp.data)
     except Exception:
         return False
+
+
+def _filesystem_list_runs(limit: int) -> list[dict[str, Any]]:
+    if not LISTINGS_DIR.exists():
+        return []
+    runs = []
+    for run_dir in sorted(LISTINGS_DIR.iterdir(), reverse=True):
+        if not run_dir.is_dir():
+            continue
+        run: dict[str, Any] = {"id": run_dir.name, "status": "unknown"}
+        runs_write = run_dir / "runs_write.json"
+        if runs_write.exists():
+            try:
+                data = json.loads(runs_write.read_text())
+                run.update(data)
+            except Exception:
+                pass
+        intake = run_dir / "intake.json"
+        if intake.exists():
+            try:
+                intake_data = json.loads(intake.read_text())
+                supplier = intake_data.get("_meta", {}).get("supplier", "")
+                run["supplier_name"] = supplier
+            except Exception:
+                pass
+        runs.append(run)
+        if len(runs) >= limit:
+            break
+    return runs
 
 
 def _filesystem_fallback(

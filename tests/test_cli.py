@@ -60,7 +60,7 @@ def _fake_intake(publish_blocked: bool = False, flags: Optional[list] = None) ->
             "payload": {
                 "productName": "Test Tour",
                 "location": {"city": "Dubai"},
-                "start_times": ["09:00", "14:00"],
+                "startTimes": ["09:00", "14:00"],
                 "faqs": [{"question": "Do I need tickets?", "answer": "Yes."}],
             },
             "_sources": {},
@@ -237,27 +237,27 @@ def test_null_is_not_empty_list_in_template_engine():
 
     # null start_times → openingHoursSpecification omitted
     intake_null = _fake_intake()
-    intake_null.payload["start_times"] = None
+    intake_null.payload["startTimes"] = None
     result_null = te_run(intake_null)
     assert "openingHoursSpecification" not in _tour_node(result_null)
 
     # [] start_times → also omitted (confirmed none exist, still no spec to emit)
     intake_empty = _fake_intake()
-    intake_empty.payload["start_times"] = []
+    intake_empty.payload["startTimes"] = []
     result_empty = te_run(intake_empty)
     assert "openingHoursSpecification" not in _tour_node(result_empty)
 
     # Non-empty start_times → present
     intake_times = _fake_intake()
-    intake_times.payload["start_times"] = ["09:00", "14:00"]
+    intake_times.payload["startTimes"] = ["09:00", "14:00"]
     result_times = te_run(intake_times)
     assert "openingHoursSpecification" in _tour_node(result_times)
     assert len(_tour_node(result_times)["openingHoursSpecification"]) == 2
 
     # The semantic distinction is preserved in the payload itself
-    assert intake_null.payload["start_times"] is None
-    assert intake_empty.payload["start_times"] == []
-    assert intake_null.payload["start_times"] != intake_empty.payload["start_times"]
+    assert intake_null.payload["startTimes"] is None
+    assert intake_empty.payload["startTimes"] == []
+    assert intake_null.payload["startTimes"] != intake_empty.payload["startTimes"]
 
     # null FAQs → FAQPage omitted; [] FAQs → also omitted
     intake_null_faqs = _fake_intake()

@@ -1,6 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
 import { ChevronRight, Search, X, UploadCloud, ChevronDown, ChevronUp, Check, Zap } from 'lucide-react';
-import type { ProcessData, UploadedFile } from '../types';
+import { api } from '../lib/api';
+import type { ProcessData } from '../types';
+
+interface UploadedFile {
+  name: string;
+  size: number;
+  type: string;
+  error?: boolean;
+  rawFile?: File;
+}
 
 const SUPPLIERS = [
   { id: 'SUP-00412', name: 'Athens Heritage Group', city: 'Athens' },
@@ -70,6 +79,7 @@ export function UploadScreen({ onProcess, onBack }: UploadScreenProps) {
         size: f.size,
         type: f.name.split('.').pop()!.toUpperCase(),
         error: f.size > MAX_FILE_SIZE,
+        rawFile: f,
       })),
     ]);
   };
@@ -87,12 +97,31 @@ export function UploadScreen({ onProcess, onBack }: UploadScreenProps) {
     inp.click();
   };
 
-  const handleProcess = () => {
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const handleProcess = async () => {
     setSubmitting(true);
-    setTimeout(() => {
+    setSubmitError(null);
+    try {
+      let supplierInput = pastedText.trim();
+      if (!supplierInput && files.length > 0) {
+        // Read text-based files; skip binary formats (PDF/DOCX need server extraction)
+        const texts = await Promise.all(
+          files
+            .filter(f => f.rawFile && (f.type === 'TXT' || f.type === 'CSV'))
+            .map(f => f.rawFile!.text())
+        );
+        supplierInput = texts.join('\n\n');
+        if (!supplierInput) {
+          supplierInput = `[Files uploaded: ${files.map(f => f.name).join(', ')}]`;
+        }
+      }
+      const { run_id } = await api.createRun(supplierInput);
+      onProcess({ expName: expName || 'New listing', runId: run_id });
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Failed to start pipeline');
       setSubmitting(false);
-      onProcess({ expName: expName || 'Acropolis & Parthenon Tickets with Audio Guide', files });
-    }, 600);
+    }
   };
 
   return (
@@ -316,7 +345,12 @@ export function UploadScreen({ onProcess, onBack }: UploadScreenProps) {
         </div>
 
         {/* CTA */}
-        <div style={{ marginTop: 28, display: 'flex', justifyContent: 'flex-end' }}>
+        <div style={{ marginTop: 28, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+          {submitError && (
+            <p style={{ fontSize: 13, color: 'var(--red)', textAlign: 'right' }}>
+              {submitError}
+            </p>
+          )}
           <button onClick={handleProcess} disabled={!canProcess || submitting} style={{
             height: 44, padding: '0 28px',
             background: canProcess && !submitting ? 'var(--purps)' : 'var(--ink30)',
