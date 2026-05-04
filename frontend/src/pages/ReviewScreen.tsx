@@ -102,7 +102,19 @@ export function ReviewScreen() {
     }).finally(() => setLoadingRun(false));
   }, [runId]);
 
-  const flagList = useMemo(() => buildFlagList(reviewData), [reviewData]);
+  const flagList = useMemo(() => {
+    const raw = buildFlagList(reviewData);
+    const skipped: Record<string, number> = {};
+    return raw.filter(fl => {
+      const resolved = resolvedSections[fl.id] ?? 0;
+      const skippedSoFar = skipped[fl.id] ?? 0;
+      if (skippedSoFar < resolved) {
+        skipped[fl.id] = skippedSoFar + 1;
+        return false;
+      }
+      return true;
+    });
+  }, [reviewData, resolvedSections]);
 
   const [activeSection, setActiveSection] = useState('s-title');
   const [bannerExpanded, setBannerExpanded] = useState(false);
@@ -249,9 +261,9 @@ export function ReviewScreen() {
 
         {!verdictReady && bannerExpanded && (
           <div className="fade-in" style={{ padding: '0 20px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {flagList.map(fl => (
+            {flagList.map((fl, idx) => (
               <button
-                key={fl.label}
+                key={`${fl.id}-${idx}`}
                 onClick={() => { scrollTo(fl.id); setBannerExpanded(false); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10, background: '#fff',
@@ -326,7 +338,7 @@ export function ReviewScreen() {
                 <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink60)', marginBottom: 2 }}>The following items need clarification from your side:</p>
                   {flagList.map((fl, i) => (
-                    <div key={fl.label} style={{ display: 'flex', gap: 10, padding: '10px 12px', background: fl.type === 'associate_action' ? '#FFF7ED' : '#FFFBEB', border: `1px solid ${fl.type === 'associate_action' ? '#FDBA74' : '#FDE68A'}`, borderRadius: 8 }}>
+                    <div key={`${fl.id}-${i}`} style={{ display: 'flex', gap: 10, padding: '10px 12px', background: fl.type === 'associate_action' ? '#FFF7ED' : '#FFFBEB', border: `1px solid ${fl.type === 'associate_action' ? '#FDBA74' : '#FDE68A'}`, borderRadius: 8 }}>
                       <span style={{ fontSize: 12, fontWeight: 700, color: fl.type === 'associate_action' ? 'var(--orange)' : 'var(--amber)', flexShrink: 0, marginTop: 1 }}>{i + 1}.</span>
                       <div>
                         <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--slate)' }}>{fl.label}</p>

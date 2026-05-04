@@ -290,13 +290,17 @@ Check `listing.seo.meta_description`:
 
 Flag type: `seo_violation`
 
-### 3.3 Tag Count
+### 3.3 Tag Count and Mix
 
 Check `listing.seo.tags[]`:
 - Must contain 8–12 items
 - All items must be lowercase and hyphen-separated (no spaces)
+- Must include a mix: at least 2 head terms (broad, high-volume — e.g. "dubai-tours", "desert-safari-dubai"), at least 2 long-tail phrases (specific, 3+ words — e.g. "evening-desert-safari-dubai", "camel-ride-dune-bashing-dubai"), and at least 1 experience-type modifier (e.g. "evening-safari", "morning-safari", "luxury-desert-safari")
+- If count is 8 (minimum) but the mix is poor (all tags are similar variations of the same phrase), add a warning
 
 Flag type: `seo_violation`
+For tag count failures (< 8 or > 12): blocker
+For poor tag mix: warning with `issue` stating specifically which tag type is missing (e.g. "No long-tail tags present — all 8 tags are broad single-activity terms") and `suggestion` with 2–3 example tags to add
 
 ### 3.4 Statistics Count
 
