@@ -263,7 +263,7 @@ export function UploadScreen() {
                     display: 'inline-flex', alignItems: 'center', gap: 6,
                   }}
                 >
-                  {sampleUsed ? '✓ Sample loaded' : '← Try a sample input'}
+                  {sampleUsed ? '✓ Sample loaded' : 'Try a sample input'}
                 </button>
               )}
             </div>
