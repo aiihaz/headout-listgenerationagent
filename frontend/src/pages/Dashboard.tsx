@@ -41,7 +41,7 @@ function rowFromApiRun(run: ApiRun): ListingRow {
     city: '—',
     status: listingStatus,
     verdict: verdictFromStatus(run.status),
-    flags: run.status === 'escalated_to_human' ? 1 : null,
+    flags: run.flag_count ?? null,
     updated: timeAgo(run.updated_at ?? run.created_at),
     assignee: 'IH',
   };

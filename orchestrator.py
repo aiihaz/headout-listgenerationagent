@@ -79,12 +79,17 @@ class PipelineResult:
     error: Optional[str]
 
 
-StatusCallback = Callable[[str, Optional[str]], None]
+StatusCallback = Callable[[str, Optional[str], Optional[int]], None]
 
 
-def _notify(state: PipelineState, callback: Optional[StatusCallback], error: Optional[str] = None) -> None:
+def _notify(
+    state: PipelineState,
+    callback: Optional[StatusCallback],
+    error: Optional[str] = None,
+    flag_count: Optional[int] = None,
+) -> None:
     if callback:
-        callback(state.value, error)
+        callback(state.value, error, flag_count)
 
 
 def run(
@@ -172,7 +177,7 @@ def run(
     if verdict in ("pass", "conditional_pass"):
         ctx.state = PipelineState.READY_FOR_PUBLISH
         ctx.finished_at = datetime.now(timezone.utc).isoformat()
-        _notify(ctx.state, status_callback)
+        _notify(ctx.state, status_callback, flag_count=len(ctx.review.review.warnings))
         _save_final(run_dir, ctx)
         return _result(ctx)
 
@@ -185,7 +190,7 @@ def run(
     if not regen_blockers:
         ctx.state = PipelineState.READY_FOR_PUBLISH
         ctx.finished_at = datetime.now(timezone.utc).isoformat()
-        _notify(ctx.state, status_callback)
+        _notify(ctx.state, status_callback, flag_count=len(associate_blockers))
         _save_final(run_dir, ctx)
         return _result(ctx)
 
@@ -225,11 +230,13 @@ def run(
     post_regen_regen = [b for b in ctx.review.review.blockers if b.action_required == "regenerate"]
     if ctx.review.review.overall in ("pass", "conditional_pass") or not post_regen_regen:
         ctx.state = PipelineState.READY_FOR_PUBLISH
+        final_flag_count = len(ctx.review.review.warnings)
     else:
         ctx.state = PipelineState.ESCALATED_TO_HUMAN
+        final_flag_count = len(ctx.review.review.blockers)
         _save_escalation(run_dir, ctx)
 
-    _notify(ctx.state, status_callback)
+    _notify(ctx.state, status_callback, flag_count=final_flag_count)
     ctx.finished_at = datetime.now(timezone.utc).isoformat()
     _save_final(run_dir, ctx)
     return _result(ctx)

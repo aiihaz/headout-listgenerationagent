@@ -15,7 +15,7 @@ export function FieldComponent({ field, showSource = true, onResolve }: FieldCom
   const [savedVal, setSavedVal] = useState(field.options ? field.options[0] : (field.value ?? ''));
   const [activeTab, setActiveTab] = useState(0);
   const [edited, setEdited] = useState(false);
-  const [expanded, setExpanded] = useState(field.status === 'review');
+  const [expanded, setExpanded] = useState(field.status === 'review' || field.status === 'associate_action');
   const [resolved, setResolved] = useState(false);
   const [sourceOpen, setSourceOpen] = useState(false);
   const [regenerating, setRegen] = useState(false);
@@ -26,16 +26,19 @@ export function FieldComponent({ field, showSource = true, onResolve }: FieldCom
 
   const borderColor = editing ? 'var(--purps)'
     : status === 'review' ? '#FCA5A5'
+    : status === 'associate_action' ? '#FDBA74'
     : status === 'caveat' ? '#FCD34D'
     : 'var(--border)';
 
   const headerBorderColor = editing ? 'var(--dreamy)'
     : status === 'review' ? '#FCA5A5'
+    : status === 'associate_action' ? '#FED7AA'
     : status === 'caveat' ? '#FDE68A'
     : 'var(--border)';
 
   const headerBg = editing ? '#FAFBFF'
     : status === 'review' ? '#FFF5F5'
+    : status === 'associate_action' ? '#FFF7ED'
     : status === 'caveat' ? '#FFFBEB'
     : '#FAFAFA';
 
@@ -269,7 +272,7 @@ export function FieldComponent({ field, showSource = true, onResolve }: FieldCom
             background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink60)', fontSize: 12,
           }}>
             {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-            Why this needs review
+            {status === 'associate_action' ? 'Why this needs your input' : 'Why this needs review'}
           </button>
           {expanded && (
             <div className="fade-in" style={{ padding: '0 14px 14px' }}>
@@ -278,6 +281,9 @@ export function FieldComponent({ field, showSource = true, onResolve }: FieldCom
                 <p style={{ fontSize: 13, color: '#92400E', marginBottom: 8, background: '#FFFBEB', padding: '6px 10px', borderRadius: 6 }}>
                   ℹ {field.caveat}
                 </p>
+              )}
+              {!field.reason && !field.caveat && (
+                <p style={{ fontSize: 13, color: 'var(--ink60)', marginBottom: 8, fontStyle: 'italic' }}>No additional context from the review agent.</p>
               )}
               {field.source && <p style={{ fontSize: 12, color: 'var(--ink60)', fontStyle: 'italic', marginBottom: 10 }}>"{field.source}"</p>}
               {!resolved && (

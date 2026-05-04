@@ -57,11 +57,13 @@ async def insert_run(run_data: dict) -> None:
 
 
 async def update_run_status(
-    run_id: str, status: str, error: Optional[str] = None
+    run_id: str, status: str, error: Optional[str] = None, flag_count: Optional[int] = None
 ) -> None:
     update: dict[str, Any] = {"status": status}
     if error:
         update["error_message"] = error
+    if flag_count is not None:
+        update["flag_count"] = flag_count
     await supabase_write_with_retry(
         "runs", update, match={"id": run_id}, operation="update"
     )
@@ -108,7 +110,7 @@ async def list_runs(limit: int = 50) -> list[dict[str, Any]]:
     try:
         resp = (
             client.table("runs")
-            .select("id,status,supplier_input,created_at,updated_at,error_message")
+            .select("id,status,supplier_input,created_at,updated_at,error_message,flag_count")
             .order("created_at", desc=True)
             .limit(limit)
             .execute()

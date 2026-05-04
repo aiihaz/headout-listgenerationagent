@@ -1,4 +1,4 @@
-export type FieldStatus = 'ready' | 'caveat' | 'review';
+export type FieldStatus = 'ready' | 'caveat' | 'review' | 'associate_action';
 export type ListingStatus = 'Draft' | 'Processing' | 'In Review' | 'Ready' | 'Published' | 'Failed';
 export type VerdictType = 'ready' | 'caveat' | 'review' | null;
 
@@ -49,6 +49,7 @@ export interface ApiRun {
   created_at?: string;
   updated_at?: string;
   error_message?: string | null;
+  flag_count?: number | null;
 }
 
 export interface ReviewBlocker {

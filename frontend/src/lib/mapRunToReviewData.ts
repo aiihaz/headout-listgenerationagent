@@ -5,7 +5,8 @@ function fieldStatus(
   blockers: ReviewBlocker[],
   warnings: ReviewWarning[],
 ): FieldStatus {
-  if (blockers.some(b => b.field.includes(fieldPath))) return 'review';
+  const blocker = blockers.find(b => b.field.includes(fieldPath));
+  if (blocker) return blocker.action_required === 'associate_action' ? 'associate_action' : 'review';
   if (warnings.some(w => w.field.includes(fieldPath))) return 'caveat';
   return 'ready';
 }

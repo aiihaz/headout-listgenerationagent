@@ -53,8 +53,8 @@ def _sync_pipeline(
 
     client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
-    def on_status(state: str, error: Optional[str] = None) -> None:
-        status_q.put((state, error))
+    def on_status(state: str, error: Optional[str] = None, flag_count: Optional[int] = None) -> None:
+        status_q.put((state, error, flag_count))
 
     try:
         orchestrator.run(
@@ -65,7 +65,7 @@ def _sync_pipeline(
             serper_api_key=settings.SERPER_API_KEY,
         )
     except Exception as exc:
-        status_q.put(("generation_blocked", str(exc)))
+        status_q.put(("generation_blocked", str(exc), None))
     finally:
         status_q.put(None)  # sentinel — drain loop exits on None
 
@@ -77,8 +77,8 @@ async def _drain_status(run_id: str, status_q: "queue.Queue[Optional[tuple]]") -
         item = await loop.run_in_executor(None, status_q.get)
         if item is None:
             break
-        state, error = item
-        await supabase_service.update_run_status(run_id, state, error)
+        state, error, flag_count = item
+        await supabase_service.update_run_status(run_id, state, error, flag_count)
 
 
 _ARTIFACT_FILES = {
@@ -140,7 +140,7 @@ def _sync_regeneration(
     run_dir = LISTINGS_DIR / run_id
 
     try:
-        status_q.put(("regeneration_in_progress", None))
+        status_q.put(("regeneration_in_progress", None, None))
 
         # Load intake
         intake_path = run_dir / "intake.json"
@@ -191,16 +191,16 @@ def _sync_regeneration(
         _save(run_dir / "review_v2.json", review_result.model_dump())
 
         if review_result.review.overall in ("pass", "conditional_pass"):
-            status_q.put(("ready_for_publish", None))
+            status_q.put(("ready_for_publish", None, len(review_result.review.warnings)))
         else:
             # Second failure after associate-initiated regen — escalate
             ctx = PipelineRun(run_id=run_id, state=PipelineState.ESCALATED_TO_HUMAN)
             ctx.review = review_result  # type: ignore[assignment]
             _save_escalation(run_dir, ctx)
-            status_q.put(("escalated_to_human", None))
+            status_q.put(("escalated_to_human", None, len(review_result.review.blockers)))
 
     except Exception as exc:
-        status_q.put(("generation_blocked", str(exc)))
+        status_q.put(("generation_blocked", str(exc), None))
     finally:
         status_q.put(None)
 
