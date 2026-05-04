@@ -44,10 +44,20 @@ function pricingTierLabel(ageGroup: string, minAge?: number | null, maxAge?: num
 }
 
 function formatCancelType(type: string): string {
-  if (type === 'FREE_CANCELLATION') return 'Free cancellation';
-  if (type === 'PARTIAL_REFUND') return 'Partial refund';
-  if (type === 'NO_REFUND') return 'Non-refundable';
-  return type;
+  return type.toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+type CancelTier = { cutoffHours?: number; refundPercentage?: number };
+
+function cancelTiersToText(tiers: CancelTier[]): string {
+  const sorted = [...tiers].sort((a, b) => (b.cutoffHours ?? 0) - (a.cutoffHours ?? 0));
+  return sorted.map(t => {
+    const h = t.cutoffHours;
+    const pct = t.refundPercentage;
+    if (pct === 100) return h ? `Full refund if cancelled ${h}+ hours before` : 'Full refund';
+    if (pct === 0) return h ? `Non-refundable within ${h} hours` : 'Non-refundable';
+    return `${pct}% refund${h ? ` if cancelled ${h}+ hours before` : ''}`;
+  }).join(' · ');
 }
 
 export function mapRunToReviewData(
@@ -135,12 +145,18 @@ export function mapRunToReviewData(
   const cancelType = cancellationPolicy.type as string | undefined;
   const cancelText = cancelType
     ? (() => {
-        const label = formatCancelType(cancelType);
+        const desc = cancellationPolicy.description as string | undefined;
+        if (desc) return desc;
+        const tiers = cancellationPolicy.tiers as CancelTier[] | undefined;
+        if (tiers && tiers.length > 0) return cancelTiersToText(tiers);
+        // backward compat: old runs with single refundPercentage/cutoffHours
         const pct = cancellationPolicy.refundPercentage as number | undefined;
         const hours = cancellationPolicy.cutoffHours as number | undefined;
-        if (cancelType === 'FREE_CANCELLATION') return hours ? `${label} up to ${hours}h before` : label;
-        if (cancelType === 'NO_REFUND') return label;
-        return `${label}${pct != null ? ` — ${pct}% back` : ''}${hours != null ? ` if cancelled ${hours}h before` : ''}`;
+        const hoursStr = hours != null ? `${hours}h` : '';
+        if (pct === 100) return hoursStr ? `Free cancellation up to ${hoursStr} before` : 'Free cancellation';
+        if (pct === 0) return 'Non-refundable';
+        if (pct != null) return `${pct}% refund${hoursStr ? ` if cancelled ${hoursStr} before` : ''}`;
+        return formatCancelType(cancelType);
       })()
     : 'Not specified';
 

@@ -102,10 +102,15 @@ export function ReviewScreen() {
   const showSourceQuotes = true;
   const [reviewData, setReviewData] = useState<ReviewData>(EMPTY_REVIEW_DATA);
   const [supplierName, setSupplierName] = useState<string>('');
-  const [flags, setFlags] = useState(0);
   const [totalFlags, setTotalFlags] = useState(0);
   const [loadingRun, setLoadingRun] = useState(!!runId);
   const [resolvedSections, setResolvedSections] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!runId) return;
+    const saved = localStorage.getItem(`review-resolved-${runId}`);
+    if (saved) { try { setResolvedSections(JSON.parse(saved)); } catch {} }
+  }, [runId]);
 
   useEffect(() => {
     if (!runId) return;
@@ -117,9 +122,8 @@ export function ReviewScreen() {
         const reviewArtifact = run.artifacts?.review as Record<string, unknown> | undefined;
         const data = mapRunToReviewData({ ...merged, review: reviewArtifact?.review });
         setReviewData(data);
-        const initial = countFlags(data);
-        setTotalFlags(initial);
-        setFlags(initial);
+        const allFlags = buildFlagList(data);
+        setTotalFlags(allFlags.filter(f => f.type !== 'caveat').length);
       }
     }).catch(() => {
       // Keep empty state on error
@@ -140,6 +144,9 @@ export function ReviewScreen() {
     });
   }, [reviewData, resolvedSections]);
 
+  const reviewFlagCount = useMemo(() => flagList.filter(f => f.type !== 'caveat').length, [flagList]);
+  const caveatFlagCount = useMemo(() => flagList.filter(f => f.type === 'caveat').length, [flagList]);
+
   const [activeSection, setActiveSection] = useState('s-title');
   const [bannerExpanded, setBannerExpanded] = useState(false);
   const [supplierModalOpen, setSupplierModalOpen] = useState(false);
@@ -147,8 +154,11 @@ export function ReviewScreen() {
   const mainRef = useRef<HTMLDivElement>(null);
 
   const markSectionResolved = (sectionId: string) => {
-    setFlags(f => Math.max(0, f - 1));
-    setResolvedSections(prev => ({ ...prev, [sectionId]: (prev[sectionId] || 0) + 1 }));
+    setResolvedSections(prev => {
+      const next = { ...prev, [sectionId]: (prev[sectionId] || 0) + 1 };
+      if (runId) localStorage.setItem(`review-resolved-${runId}`, JSON.stringify(next));
+      return next;
+    });
   };
 
   function resolvedOrActual(sectionId: string, actual: FieldStatus, resolveThreshold = 1): FieldStatus {
@@ -198,9 +208,10 @@ export function ReviewScreen() {
     return () => window.removeEventListener('raiseWithSupplier', handler);
   }, []);
 
-  const verdictReady = flags === 0 && !loadingRun;
+  const verdictReady = reviewFlagCount === 0 && !loadingRun;
+  const fullyReady = verdictReady && caveatFlagCount === 0;
   const experienceName = reviewData.title.options?.[0] ?? reviewData.title.value ?? 'Untitled listing';
-  const progressPct = totalFlags > 0 ? Math.round(((totalFlags - flags) / totalFlags) * 100) : 0;
+  const progressPct = totalFlags > 0 ? Math.round(((totalFlags - reviewFlagCount) / totalFlags) * 100) : 0;
 
   if (loadingRun) {
     return (
@@ -268,23 +279,33 @@ export function ReviewScreen() {
               borderRadius: 999, transition: 'width 400ms ease-out',
             }} />
           </div>
-          {verdictReady ? (
+          {fullyReady ? (
             <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#166534', whiteSpace: 'nowrap' }}>
               <CheckCircle size={14} color="var(--green)" /> Ready to publish
             </span>
+          ) : verdictReady ? (
+            <button
+              onClick={() => setBannerExpanded(!bannerExpanded)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#166534', background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', padding: 0 }}
+            >
+              <CheckCircle size={14} color="var(--green)" />
+              Ready · {caveatFlagCount} {caveatFlagCount !== 1 ? 'caveats' : 'caveat'}
+              {bannerExpanded ? <X size={13} color="#166534" /> : <ArrowRight size={13} color="#166534" />}
+            </button>
           ) : (
             <button
               onClick={() => setBannerExpanded(!bannerExpanded)}
               style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#92400E', background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', padding: 0 }}
             >
               <AlertTriangle size={14} color="var(--amber)" />
-              {flags} {flags !== 1 ? 'issues' : 'issue'} to resolve
+              {reviewFlagCount} {reviewFlagCount !== 1 ? 'issues' : 'issue'} to resolve
+              {caveatFlagCount > 0 && <span style={{ fontWeight: 400, color: '#92400E' }}>· {caveatFlagCount} caveats</span>}
               {bannerExpanded ? <X size={13} color="#92400E" /> : <ArrowRight size={13} color="#92400E" />}
             </button>
           )}
         </div>
 
-        {!verdictReady && bannerExpanded && (
+        {(verdictReady ? caveatFlagCount > 0 : true) && bannerExpanded && (
           <div className="fade-in" style={{ padding: '0 20px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
             {flagList.map((fl, idx) => (
               <button

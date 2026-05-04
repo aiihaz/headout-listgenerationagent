@@ -250,10 +250,14 @@ Produce exactly this structure. Every field must have an annotation comment.
     "faqs": [{ "question": "string", "answer": "string" }],
     "media": [{ "url": "string", "type": "IMAGE | VIDEO", "alt": "string", "order": "integer" }],
     "cancellationPolicy": {
-      "type": "REFUND_BEFORE_CUTOFF | NON_REFUNDABLE | PARTIAL_REFUND",
-      "refundPercentage": "integer 0-100",
-      "cutoffHours": "integer or null",
-      "description": "string — human readable policy, must document ALL tiers if more than one exists"
+      "type": "FREE_CANCELLATION | NON_REFUNDABLE | TIERED",
+      "description": "string — required; plain-English summary of ALL conditions (e.g. 'Full refund if cancelled 48+ hours before. 50% refund if cancelled 24–48 hours before. Non-refundable within 24 hours.')",
+      "tiers": [
+        {
+          "cutoffHours": "integer — hours before activity start that this tier applies FROM; use 0 for 'within any time / no-shows'",
+          "refundPercentage": "integer 0-100"
+        }
+      ]
     },
     "variants": [
       {
@@ -349,11 +353,31 @@ Generate copy only from what the supplier provided. Do not invent activities, vi
 - Hotel pickup counts or named hotel lists ("pick-up from 15 hotels in Dubai Marina") — set `hasHotelPickup: true` and add a plain line to `importantInformation[]` ("Hotel pick-up included — hotel name required at checkout"); do not name hotels or counts in description.
 - Competitor pricing figures — use competitor references to inform your understanding of the price tier only; do not quote or reference competitor prices in any customer-facing field.
 
-**Two-tier cancellation policy handling:** When the supplier gives two refund thresholds (e.g. "24hr full refund / 48hr 50% refund"), use this mapping:
-- Identify which cutoff corresponds to the FULL refund (100%). That is the primary cutoff.
-- Set `type: "REFUND_BEFORE_CUTOFF"`, `refundPercentage: 100`, `cutoffHours` = the full-refund threshold.
-- Document both tiers in `description` in plain English.
-- Example: "24hr full refund / 48hr 50% refund" → `type: "REFUND_BEFORE_CUTOFF"`, `refundPercentage: 100`, `cutoffHours: 24`, `description: "Full refund if cancelled 24+ hours before departure. 50% refund for cancellations within 24 hours. No refund for no-shows."`
+**Cancellation policy handling:**
+
+- Always populate `description` — it is required and must fully describe the policy in plain English.
+- Always populate `tiers` — one entry per distinct refund threshold, ordered from most favourable (highest `cutoffHours`) to least.
+- Use `type: "FREE_CANCELLATION"` when there is exactly one tier with `refundPercentage: 100`.
+- Use `type: "NON_REFUNDABLE"` when there is only a `refundPercentage: 0` condition.
+- Use `type: "TIERED"` for everything else (partial refunds, multiple thresholds, mixed policies).
+- Always include a final tier with `cutoffHours: 0` to document what happens at the last moment / no-show.
+
+Examples:
+
+"Free cancellation up to 24 hours before" →
+```json
+{ "type": "FREE_CANCELLATION", "description": "Full refund if cancelled 24+ hours before. No refund within 24 hours.", "tiers": [{ "cutoffHours": 24, "refundPercentage": 100 }, { "cutoffHours": 0, "refundPercentage": 0 }] }
+```
+
+"48hr full refund / 24–48hr 50% / within 24hr no refund" →
+```json
+{ "type": "TIERED", "description": "Full refund if cancelled 48+ hours before. 50% refund if cancelled 24–48 hours before. Non-refundable within 24 hours.", "tiers": [{ "cutoffHours": 48, "refundPercentage": 100 }, { "cutoffHours": 24, "refundPercentage": 50 }, { "cutoffHours": 0, "refundPercentage": 0 }] }
+```
+
+"Non-refundable" →
+```json
+{ "type": "NON_REFUNDABLE", "description": "Non-refundable. No refund for any cancellation or no-show.", "tiers": [{ "cutoffHours": 0, "refundPercentage": 0 }] }
+```
 
 ---
 
@@ -382,7 +406,7 @@ Do not stop for missing images, missing child pricing, or missing guide language
 □ city is an object {code, name} — not a flat string
 □ variants[*].pricing[] is an array of {ageGroup, pricePerUnit (dollars), currencyCode} — never a flat price field
 □ pricePerUnit is in dollars/euros — NOT cents (89.00 not 8900)
-□ cancellationPolicy has refundPercentage (0-100) and description
+□ cancellationPolicy has description (required) and tiers[] with at least one entry
 □ inputFields[] is present and includes at minimum firstName, lastName, email for PER_PERSON experiences
 □ weatherDependent is set for all outdoor/desert/water activities
 □ openingHours is set for ATTRACTION_TICKET experiences, null otherwise
