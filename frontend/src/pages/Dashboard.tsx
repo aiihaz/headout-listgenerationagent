@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Plus, Inbox, RefreshCw } from 'lucide-react';
 import { api } from '../lib/api';
+import { supabase } from '../lib/supabase';
 import type { ListingRow, ApiRun } from '../types';
 import { runStatusToListingStatus } from '../types';
 
@@ -61,6 +62,20 @@ export function Dashboard() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('All');
+  const [userInitials, setUserInitials] = useState('?');
+
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.auth.getSession().then(({ data }) => {
+      const user = data.session?.user;
+      if (!user) return;
+      const fullName = user.user_metadata?.full_name as string | undefined;
+      const email = user.email ?? '';
+      const name = fullName || email.split('@')[0];
+      const parts = name.split(/[\s._-]+/).filter(Boolean);
+      setUserInitials(parts.slice(0, 2).map((p: string) => p[0].toUpperCase()).join('') || '?');
+    });
+  }, []);
   const [listings, setListings] = useState<ListingRow[]>(() => {
     try {
       const cached = localStorage.getItem(CACHE_KEY);
@@ -224,7 +239,7 @@ export function Dashboard() {
                         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: 11, fontWeight: 700, color: 'var(--purps)',
                       }}>
-                        {l.assignee}
+                        {userInitials}
                       </span>
                     </td>
                   </tr>
