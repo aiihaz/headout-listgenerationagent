@@ -1,7 +1,7 @@
 # Headout AI Listing Generation Pipeline — Product Log
 
 > **Working directory**: `/Users/ihaz/Projects/list generation agent/`
-> **Last updated**: 2026-05-04 (Session 17)
+> **Last updated**: 2026-05-04 (Session 18)
 > **Status**: CLI pipeline complete and **verified end-to-end with OpenAI**. Frontend complete (all 6 screens, wired to real API, **deployed to Vercel**). Backend complete (Phases 1–2), **deployed to Render**. Full production stack live. URL routing overhauled (react-router-dom, `/listings/:id/` scheme, Vercel SPA rewrite). TopNav logout dropdown added. **Frontend: https://headout-listing-agent.vercel.app | Backend: https://headout-listgenerationagent.onrender.com**
 > **Repo**: https://github.com/aiihaz/headout-listgenerationagent (default branch: `staging`)
 
@@ -511,6 +511,85 @@ All 6 screens built, verified in browser, production build passing. See "Fronten
 ---
 
 ## Session History
+
+### Session 18 — Review Quality Fixes: associate_action pill, real flag counts, regen context (2026-05-04)
+
+Four improvements to review quality and pipeline accuracy.
+
+**`associate_action` status pill**
+
+The review agent distinguishes two blocker types: `regenerate` (content can be auto-fixed) and `associate_action` (intake data is the gap — a human decision is needed). The UI previously collapsed both to red "Needs review." Added a distinct orange "Needs your input" pill, field border, and expanded-by-default state for `associate_action` fields.
+
+Changes:
+- `frontend/src/types.ts` — added `'associate_action'` to `FieldStatus` union
+- `frontend/src/index.css` — added `--orange` / `--orange-bg` tokens
+- `frontend/src/components/StatusPill.tsx` — `associate_action` config entry with orange colors
+- `frontend/src/components/FieldComponent.tsx` — orange border, expanded by default, "Why this needs your input" label
+- `frontend/src/lib/mapRunToReviewData.ts` — `fieldStatus()` returns `'associate_action'` when `blocker.action_required === 'associate_action'`
+- `frontend/src/pages/ReviewScreen.tsx` — `buildFlagList`, `countFlags`, `statusDot`, banner, and supplier modal all updated for the new status
+
+**Real flag counts on dashboard**
+
+The dashboard was hardcoding "1 caveat" for every non-clean listing. Root cause: the lightweight `listRuns` response had no flag count. Fixed by adding a `flag_count` column to the `runs` table, written at every terminal pipeline state transition.
+
+Changes:
+- Supabase `runs` table — `flag_count INTEGER` column added via `execute_sql`
+- `orchestrator.py` — `StatusCallback` type updated to `Callable[[str, Optional[str], Optional[int]], None]`; terminal transitions pass actual counts (`len(warnings)`, `len(blockers)`, etc.)
+- `backend/services/pipeline_service.py` — queue tuples changed from 2-tuple to 3-tuple `(state, error, flag_count)`; `_drain_status` passes `flag_count` to `update_run_status`
+- `backend/services/supabase_service.py` — `update_run_status` accepts optional `flag_count`; `list_runs` select includes `flag_count`
+- `frontend/src/types.ts` — `ApiRun` interface gains `flag_count?: number | null`
+- `frontend/src/pages/Dashboard.tsx` — `verdictFromStatus` uses real `flag_count`; `rowFromApiRun` passes it through
+- `backend/tests/test_pipeline_service.py` — assertion updated to 3-tuple format
+
+**Assignee avatar from auth session**
+
+Dashboard was hardcoding the assignee avatar to "IH". Fixed by reading user initials from the Supabase auth session, same pattern already used in TopNav.
+
+Changes: `frontend/src/pages/Dashboard.tsx` — `userInitials` state derived from `supabase.auth.getSession()`
+
+**Lightweight `/status` polling endpoint**
+
+ProcessingScreen was calling `GET /api/v1/runs/{id}` (full artifact join, loads all JSON payloads) every 2.5 seconds during pipeline processing. Added a dedicated status-only endpoint that returns just `{id, status, error_message, supplier_name}`.
+
+Changes:
+- `backend/routers/runs.py` — `GET /runs/{run_id}/status` route added BEFORE the full `GET /runs/{run_id}` route (FastAPI route ordering is critical)
+- `backend/services/supabase_service.py` — `get_run_status()` function with minimal column select
+- `frontend/src/lib/api.ts` — `RunStatusResponse` type + `getRunStatus()` method
+- `frontend/src/pages/ProcessingScreen.tsx` — polling switched from `api.getRun()` to `api.getRunStatus()`
+
+**TopNav cleanup**
+
+Removed the always-on "Saved" indicator (was static, not tied to real save events) from TopNav and the `autoSave` prop plumbing in `App.tsx`.
+
+Changes: `frontend/src/App.tsx`, `frontend/src/components/TopNav.tsx`
+
+**Regen prompt quality fixes**
+
+Two changes to the targeted regeneration pass:
+1. `agents/content_generator.py` — `_build_regen_prompt` now includes `intake_says` (the review agent's record of what the supplier actually provided) alongside `found` and `fix_instruction`, giving the content generator ground-truth context to write a correct replacement
+2. `agent_prompt_review.md` — Extended the "do not flag" exception to cover highlights (previously only description body copy was protected); added explicit rule that brand+model pairs where the model name is unambiguous (e.g. "Land Cruiser") don't require the brand prefix; forbids fix instructions that say "match intake wording" — instructions must target the specific wrong value only
+
+**Files modified (this session):**
+- `agent_prompt_review.md`
+- `agents/content_generator.py`
+- `backend/routers/runs.py`
+- `backend/services/pipeline_service.py`
+- `backend/services/supabase_service.py`
+- `backend/tests/test_pipeline_service.py`
+- `frontend/src/App.tsx`
+- `frontend/src/components/FieldComponent.tsx`
+- `frontend/src/components/StatusPill.tsx`
+- `frontend/src/components/TopNav.tsx`
+- `frontend/src/index.css`
+- `frontend/src/lib/api.ts`
+- `frontend/src/lib/mapRunToReviewData.ts`
+- `frontend/src/pages/Dashboard.tsx`
+- `frontend/src/pages/ProcessingScreen.tsx`
+- `frontend/src/pages/ReviewScreen.tsx`
+- `frontend/src/types.ts`
+- `orchestrator.py`
+
+---
 
 ### Session 17 — URL Routing + Logout (2026-05-04)
 

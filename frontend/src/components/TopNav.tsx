@@ -1,12 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { Check, LogOut } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { signOut, supabase } from '../lib/supabase';
 
-interface TopNavProps {
-  autoSave?: boolean;
-}
-
-export function TopNav({ autoSave }: TopNavProps) {
+export function TopNav() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const [initials, setInitials] = useState('');
@@ -50,11 +46,6 @@ export function TopNav({ autoSave }: TopNavProps) {
       <span style={{ width: 1, height: 20, background: 'var(--border)' }} />
       <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink60)' }}>Listing Agent</span>
       <span style={{ flex: 1 }} />
-      {autoSave && (
-        <span style={{ fontSize: 12, color: 'var(--ink60)', display: 'flex', alignItems: 'center', gap: 5 }}>
-          <Check size={13} color="var(--green)" /> Saved
-        </span>
-      )}
       <div ref={ref} style={{ position: 'relative' }}>
         <span
           onClick={() => setOpen(v => !v)}

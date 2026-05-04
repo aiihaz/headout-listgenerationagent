@@ -67,7 +67,7 @@ def _build_regen_prompt(
     serper_context: Optional[SerperContext] = None,
 ) -> str:
     fix_lines = "\n".join(
-        f"Field: {b['field']}\nProblem: {b['found']}\nInstruction: {b['fix_instruction']}"
+        f"Field: {b['field']}\nProblem: {b['found']}\nIntake says: {b.get('intake_says', 'n/a')}\nInstruction: {b['fix_instruction']}"
         for b in blockers
     )
     serper_section = ""

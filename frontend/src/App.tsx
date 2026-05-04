@@ -10,18 +10,11 @@ import { PublishedScreen } from './pages/PublishedScreen';
 import { LoginScreen } from './pages/LoginScreen';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { supabase } from './lib/supabase';
-import { useLocation } from 'react-router-dom';
-
-function useAutoSave() {
-  const { pathname } = useLocation();
-  return pathname.includes('/review');
-}
 
 function AppShell() {
-  const autoSave = useAutoSave();
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
-      <TopNav autoSave={autoSave} />
+      <TopNav />
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <ErrorBoundary>
           <Routes>
