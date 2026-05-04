@@ -141,24 +141,28 @@ export function mapRunToReviewData(
     } satisfies FieldData,
   ]);
 
-  const cancellationPolicy = (intakePayload.cancellationPolicy as Record<string, unknown>) ?? {};
-  const cancelType = cancellationPolicy.type as string | undefined;
-  const cancelText = cancelType
-    ? (() => {
-        const desc = cancellationPolicy.description as string | undefined;
-        if (desc) return desc;
-        const tiers = cancellationPolicy.tiers as CancelTier[] | undefined;
-        if (tiers && tiers.length > 0) return cancelTiersToText(tiers);
-        // backward compat: old runs with single refundPercentage/cutoffHours
-        const pct = cancellationPolicy.refundPercentage as number | undefined;
-        const hours = cancellationPolicy.cutoffHours as number | undefined;
-        const hoursStr = hours != null ? `${hours}h` : '';
-        if (pct === 100) return hoursStr ? `Free cancellation up to ${hoursStr} before` : 'Free cancellation';
-        if (pct === 0) return 'Non-refundable';
-        if (pct != null) return `${pct}% refund${hoursStr ? ` if cancelled ${hoursStr} before` : ''}`;
-        return formatCancelType(cancelType);
-      })()
-    : 'Not specified';
+  const rawCancelPolicy = intakePayload.cancellationPolicy;
+  const cancellationPolicy = (rawCancelPolicy && typeof rawCancelPolicy === 'object' ? rawCancelPolicy : {}) as Record<string, unknown>;
+  const cancelType = typeof cancellationPolicy.type === 'string' ? cancellationPolicy.type : undefined;
+  const desc = typeof cancellationPolicy.description === 'string' && cancellationPolicy.description ? cancellationPolicy.description : undefined;
+  const cancelTiers = cancellationPolicy.tiers as CancelTier[] | undefined;
+  const cancelText = (() => {
+    if (desc) return desc;
+    if (Array.isArray(cancelTiers) && cancelTiers.length > 0) return cancelTiersToText(cancelTiers);
+    // backward compat: old runs with single refundPercentage/cutoffHours
+    const pct = typeof cancellationPolicy.refundPercentage === 'number' ? cancellationPolicy.refundPercentage : undefined;
+    const hours = typeof cancellationPolicy.cutoffHours === 'number' ? cancellationPolicy.cutoffHours : undefined;
+    const hoursStr = hours != null ? `${hours}h` : '';
+    if (pct === 100) return hoursStr ? `Free cancellation up to ${hoursStr} before` : 'Free cancellation';
+    if (pct === 0) return 'Non-refundable';
+    if (pct != null) return `${pct}% refund${hoursStr ? ` if cancelled ${hoursStr} before` : ''}`;
+    if (cancelType === 'FREE_CANCELLATION') return 'Free cancellation';
+    if (cancelType === 'NON_REFUNDABLE') return 'Non-refundable';
+    if (cancelType) return formatCancelType(cancelType);
+    return 'Not specified';
+  })();
+  // TIERED with no description and no tiers = incomplete data, flag for human review
+  const cancelIncomplete = cancelType === 'TIERED' && !desc && (!Array.isArray(cancelTiers) || cancelTiers.length === 0);
 
   const rawPricingType = (intakePayload.pricingType as string | undefined) === 'PER_GROUP' ? 'PER_GROUP' : 'PER_PERSON';
   const maxGroupSize = intakePayload.maxGroupSize as number | null | undefined;
@@ -215,16 +219,16 @@ export function mapRunToReviewData(
       id: 'cancel',
       label: 'Cancellation policy',
       value: cancelText,
-      status: fieldStatus('cancellationPolicy', blockers, warnings),
-      reason: fixReason('cancellationPolicy', blockers),
+      status: cancelIncomplete ? 'associate_action' : fieldStatus('cancellationPolicy', blockers, warnings),
+      reason: cancelIncomplete ? 'Tiered policy detected but no tier details were extracted. Update manually or raise with supplier.' : fixReason('cancellationPolicy', blockers),
       source: sourceLabel(sources, 'cancellationPolicy'),
-      action: fieldAction('cancellationPolicy', blockers),
+      action: cancelIncomplete ? 'associate_action' : fieldAction('cancellationPolicy', blockers),
     },
     seoNote: {
       id: 'seo',
       label: 'SEO tags',
       value: tags.join(', ') || (seoObj?.metaDescription as string) || '',
-      status: fieldStatus('seo', blockers, warnings),
+      status: fieldStatus('seo', blockers, []),
       reason: fixReason('seo', blockers),
       source: null,
       action: fieldAction('seo', blockers),

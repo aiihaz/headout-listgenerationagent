@@ -1,7 +1,7 @@
 # Headout AI Listing Generation Pipeline — Product Log
 
 > **Working directory**: `/Users/ihaz/Projects/list generation agent/`
-> **Last updated**: 2026-05-04 (Session 18)
+> **Last updated**: 2026-05-04 (Session 20)
 > **Status**: CLI pipeline complete and **verified end-to-end with OpenAI**. Frontend complete (all 6 screens, wired to real API, **deployed to Vercel**). Backend complete (Phases 1–2), **deployed to Render**. Full production stack live. URL routing overhauled (react-router-dom, `/listings/:id/` scheme, Vercel SPA rewrite). TopNav logout dropdown added. **Frontend: https://headout-listing-agent.vercel.app | Backend: https://headout-listgenerationagent.onrender.com**
 > **Repo**: https://github.com/aiihaz/headout-listgenerationagent (default branch: `staging`)
 
@@ -512,6 +512,29 @@ All 6 screens built, verified in browser, production build passing. See "Fronten
 ---
 
 ## Session History
+
+### Session 20 — Review Screen: SEO caveat suppression + cancellation policy robustness (2026-05-04)
+
+Two fixes to the review screen's field mapping layer.
+
+**SEO tags — suppress caveat badge**
+
+SEO tags are always AI-generated, so review-agent warnings on that field (e.g. poor tag mix) are expected noise rather than something requiring human attention. The field was being marked amber ("Caveat added") whenever the review agent emitted any SEO warning.
+
+Fix: `mapRunToReviewData` now passes an empty warnings array when computing SEO tag status, so the field only turns red if there is a hard blocker. Warnings are still recorded in the review artifact but no longer surface as a UI flag.
+
+**Cancellation policy — robust display + incomplete-data flag**
+
+The cancellation value display had two problems:
+1. `cancellationPolicy` was cast without a type guard, so a non-object value (e.g. a raw string) would silently corrupt downstream reads.
+2. When intake produced `type: "TIERED"` without a `description` or `tiers` array, the field showed the raw enum string ("TIERED") instead of human-readable text.
+
+Fix: added explicit type guard on `cancellationPolicy`, added named fallbacks for `FREE_CANCELLATION` / `NON_REFUNDABLE` / `TIERED` types, and introduced a `cancelIncomplete` flag. When a TIERED policy has neither a description nor tier data, the field is forced to `associate_action` status with a clear reason ("Tiered policy detected but no tier details were extracted") so the human reviewer knows to fill it in rather than publishing an incomplete policy.
+
+**Files modified:**
+- `frontend/src/lib/mapRunToReviewData.ts`
+
+---
 
 ### Session 19 — QA Pass: /status 404 bug + regression test (2026-05-04)
 
