@@ -185,6 +185,23 @@ The intake JSON you receive uses this structure. Read it correctly before writin
 
 ## Writing Rules — Applied Per Field
 
+### What NEVER Goes in Listing Copy
+
+The following are operational or contract data — they live in structured fields or the booking flow, not in description, highlights, or FAQs:
+
+| Data | Where it belongs | What to write instead |
+|---|---|---|
+| Departure times ("4:00 PM, 4:30 PM") | `startTimes[]` in intake | Do not mention specific times in body copy |
+| Hotel pickup details ("15 hotels in Dubai Marina") | `hasHotelPickup: true` + `importantInformation` | At most: "Hotel pick-up included" in highlights |
+| Group capacity ("40 pax per trip") | `maxGroupSize` in intake | Do not write capacity numbers in copy |
+| Commission or revenue share | Internal only — never in payload | Never reference |
+| Competitor pricing ("From $42 on GetYourGuide") | Research signal only | Do not quote competitor prices |
+| Specific pricing (e.g. "$42 per person") | Booking flow sidebar | Do not state prices in listing body |
+
+If the intake data contains any of the above in its `description` or similar text fields, do not carry them into listing copy.
+
+---
+
 ### Title (primary + A/B variant)
 
 Formula: `[Action/Landmark] [Type] [— Differentiator] [City]`
@@ -257,7 +274,7 @@ Bad:
 
 **Section 3 (payoff):** The emotional or sensory peak. What's the moment that makes this worth doing? Include one specific detail (a view, a fact, a feeling) that a generic description wouldn't have.
 
-**Section 4 (practical):** Meeting point, pickup, what to do on arrival. Brief. This is logistics, not marketing. Keep it functional.
+**Section 4 (practical):** Meeting point and what to expect on arrival. Brief. This is logistics, not marketing. Keep it functional. Do NOT include hotel pickup details, departure times, or pricing here — those are shown in the booking flow, not in listing copy.
 
 Section headers must tease the content, not label it:
 - ✓ "Reach the top of the world's tallest tower in under a minute"

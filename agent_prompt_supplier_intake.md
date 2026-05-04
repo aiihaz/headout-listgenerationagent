@@ -253,7 +253,7 @@ Produce exactly this structure. Every field must have an annotation comment.
       "type": "REFUND_BEFORE_CUTOFF | NON_REFUNDABLE | PARTIAL_REFUND",
       "refundPercentage": "integer 0-100",
       "cutoffHours": "integer or null",
-      "description": "string — human readable policy"
+      "description": "string — human readable policy, must document ALL tiers if more than one exists"
     },
     "variants": [
       {
@@ -341,6 +341,19 @@ Generate copy only from what the supplier provided. Do not invent activities, vi
 **Inclusions:** List only explicit or strongly implied items. Implied items must be recorded in `_sources` (e.g. `"inclusions.N": "INFERRED"`) so the Review Agent can verify them. Do not add inline comments to JSON values.
 
 **FAQs:** Minimum 7. Always include: logistics (pickup/location), timing, cancellation policy, child suitability. Every CONDITIONAL inclusion gets its own FAQ. Every DEFERRED field gets a FAQ directing customers to contact the operator before visiting.
+
+**What to EXCLUDE from all customer-facing fields (description, importantInformation, faqs, highlights):**
+- Commission rates, revenue share percentages, or any internal contract terms — these must not appear anywhere in the payload. Silently discard them.
+- Specific departure time counts in prose ("2 departures daily") — extract the times into `startTimes[]` only.
+- Internal capacity numbers used as a marketing claim ("capacity 40 pax") — extract into `maxGroupSize` only; do not write them into description or highlights.
+- Hotel pickup counts or named hotel lists ("pick-up from 15 hotels in Dubai Marina") — set `hasHotelPickup: true` and add a plain line to `importantInformation[]` ("Hotel pick-up included — hotel name required at checkout"); do not name hotels or counts in description.
+- Competitor pricing figures — use competitor references to inform your understanding of the price tier only; do not quote or reference competitor prices in any customer-facing field.
+
+**Two-tier cancellation policy handling:** When the supplier gives two refund thresholds (e.g. "24hr full refund / 48hr 50% refund"), use this mapping:
+- Identify which cutoff corresponds to the FULL refund (100%). That is the primary cutoff.
+- Set `type: "REFUND_BEFORE_CUTOFF"`, `refundPercentage: 100`, `cutoffHours` = the full-refund threshold.
+- Document both tiers in `description` in plain English.
+- Example: "24hr full refund / 48hr 50% refund" → `type: "REFUND_BEFORE_CUTOFF"`, `refundPercentage: 100`, `cutoffHours: 24`, `description: "Full refund if cancelled 24+ hours before departure. 50% refund for cancellations within 24 hours. No refund for no-shows."`
 
 ---
 

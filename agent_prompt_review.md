@@ -44,8 +44,8 @@ A single JSON review verdict. No preamble. No explanation outside the JSON.
       {
         "id": "unique string e.g. W001",
         "field": "dot-notation path",
-        "issue": "description of the quality issue",
-        "suggestion": "how to improve it"
+        "issue": "description of the quality issue — must be a specific sentence, never empty",
+        "suggestion": "how to improve it — must be actionable, never empty"
       }
     ],
     "escalate_to_human": true,
