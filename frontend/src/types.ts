@@ -46,6 +46,7 @@ export interface ApiRun {
   status: RunStatus;
   supplier_input: string;
   supplier_name?: string;
+  experience_name?: string | null;
   created_at?: string;
   updated_at?: string;
   error_message?: string | null;

@@ -38,3 +38,4 @@ frontend/.vite/
 .claude/
 .playwright-mcp/
 .mcp.json
+.gstack/

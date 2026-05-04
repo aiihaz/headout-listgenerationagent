@@ -12,6 +12,7 @@ router = APIRouter(tags=["runs"])
 
 class CreateRunRequest(BaseModel):
     supplier_input: str
+    experience_name: Optional[str] = None
 
 
 class CreateRunResponse(BaseModel):
@@ -41,6 +42,8 @@ async def create_run(
         "supplier_input": body.supplier_input,
         "status": "pending",
     }
+    if body.experience_name:
+        row["experience_name"] = body.experience_name
     if user.get("id"):
         row["created_by"] = user["id"]
     await supabase_service.insert_run(row)

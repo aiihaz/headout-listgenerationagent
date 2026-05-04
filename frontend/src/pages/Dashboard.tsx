@@ -31,8 +31,7 @@ function timeAgo(iso?: string): string {
 
 function rowFromApiRun(run: ApiRun): ListingRow {
   const listingStatus = runStatusToListingStatus(run.status);
-  const experienceName = run.supplier_name
-    || (run.supplier_input?.split('\n')[0]?.slice(0, 60).trim())
+  const experienceName = run.experience_name?.trim()
     || run.id.slice(0, 8);
   return {
     id: run.id,
@@ -87,8 +86,8 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchRuns = async (showLoading = true) => {
-    if (showLoading && listings.length === 0) setLoading(true);
+  const fetchRuns = async () => {
+    setLoading(true);
     setError(null);
     try {
       const runs = await api.listRuns();
@@ -119,7 +118,7 @@ export function Dashboard() {
           <p style={{ fontSize: 13, color: 'var(--ink60)', marginTop: 2 }}>{listings.length} total</p>
         </div>
         <span style={{ flex: 1 }} />
-        <button onClick={() => fetchRuns(false)} title="Refresh" style={{ background: 'none', border: '1.5px solid var(--border)', borderRadius: 8, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+        <button onClick={() => fetchRuns()} title="Refresh" style={{ background: 'none', border: '1.5px solid var(--border)', borderRadius: 8, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
           <RefreshCw size={14} color={loading ? 'var(--purps)' : 'var(--ink60)'} style={{ transition: 'color 150ms', animation: loading ? 'spin 0.8s linear infinite' : 'none' }} />
         </button>
         <div style={{ position: 'relative' }}>
@@ -213,7 +212,7 @@ export function Dashboard() {
                     onMouseEnter={e => (e.currentTarget.style.background = '#FAFAFA')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
-                    <td style={{ padding: '13px 16px', fontSize: 13, fontWeight: 500, maxWidth: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.experience}</td>
+                    <td style={{ padding: '13px 16px', fontSize: 13, fontWeight: 500, maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={l.experience}>{l.experience}</td>
                     <td style={{ padding: '13px 16px' }}>
                       <span style={{
                         display: 'inline-flex', alignItems: 'center', gap: 4,

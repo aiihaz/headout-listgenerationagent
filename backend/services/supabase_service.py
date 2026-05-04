@@ -129,7 +129,7 @@ async def list_runs(limit: int = 50) -> list[dict[str, Any]]:
     try:
         resp = (
             client.table("runs")
-            .select("id,status,supplier_input,created_at,updated_at,error_message,flag_count")
+            .select("id,status,supplier_input,experience_name,created_at,updated_at,error_message,flag_count")
             .order("created_at", desc=True)
             .limit(limit)
             .execute()

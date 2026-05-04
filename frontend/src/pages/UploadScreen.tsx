@@ -24,6 +24,13 @@ const SUPPLIERS = [
   { id: 'SUP-00611', name: 'Cairo Pharaoh Expeditions', city: 'Cairo' },
 ];
 
+const SAMPLE_INPUT = `supplier 1: Desert Adventures LLC — Dubai
+Contract: Commission 22%, capacity 40 pax per trip, 2 departures daily (4:00 PM, 4:30 PM), blackout dates Dec 25 + Jan 1, cancellation 24hr full refund / 48hr 50% refund. Operating since 2019. Pick-up from 15 hotels in Dubai Marina and JBR. Trip duration approximately 6 hours.
+Supplier description:
+We offering best desert safari experience in Dubai desert. Include dune bashing in Toyota Land Cruiser, camel ride small duration, sand boarding for adventure lovers, henna painting for ladies, BBQ dinner under star with belly dance show and fire show. Vegetarian option is available for dinner. Professional photographer take photos. Also falcon photo opportunity. Shisha available.
+Competitor reference:
+GetYourGuide: 'Dubai: Red Dune Safari with Quad Bike, Sandboard & Camel Ride' — 4.4 stars, 12,847 reviews, From $42`;
+
 const ACCEPTED_TYPES = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/csv', 'text/plain'];
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
 
@@ -40,8 +47,10 @@ export function UploadScreen() {
   const [supplierID, setSupplierID] = useState('');
   const [supplierQuery, setSupplierQuery] = useState('');
   const [supplierOpen, setSupplierOpen] = useState(false);
+  const [supplierNotFoundModal, setSupplierNotFoundModal] = useState(false);
   const [expName, setExpName] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [sampleUsed, setSampleUsed] = useState(false);
   const supplierRef = useRef<HTMLDivElement>(null);
 
   const selectedSupplier = SUPPLIERS.find(s => s.id === supplierID);
@@ -112,8 +121,8 @@ export function UploadScreen() {
           supplierInput = `[Files uploaded: ${files.map(f => f.name).join(', ')}]`;
         }
       }
-      const { run_id } = await api.createRun(supplierInput);
-      navigate(`/listings/${run_id}/processing`, { state: { expName: expName || 'New listing' } });
+      const { run_id } = await api.createRun(supplierInput, expName.trim() || undefined);
+      navigate(`/listings/${run_id}/processing`, { state: { expName: expName.trim() || 'New listing' } });
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Failed to start pipeline');
       setSubmitting(false);
@@ -224,17 +233,39 @@ export function UploadScreen() {
                 </button>
               )}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-              <p style={{ fontSize: 12, color: 'var(--ink60)' }}>
-                {pastedText.length === 0
-                  ? "Tip: more context = better listing. Don't trim."
-                  : pastedText.length < 200
-                    ? '⚠ Short input — add more detail if possible'
-                    : `${pastedText.length.toLocaleString()} characters · looks good`}
-              </p>
-              <span style={{ fontSize: 12, color: pastedText.length > 200 ? 'var(--green)' : 'var(--ink30)', fontWeight: 500 }}>
-                {pastedText.length > 200 ? '✓ Ready' : ''}
-              </span>
+            <div style={{ marginTop: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <p style={{ fontSize: 12, color: 'var(--ink60)' }}>
+                  {pastedText.length === 0
+                    ? "Tip: more context = better listing. Don't trim."
+                    : pastedText.length < 200
+                      ? '⚠ Short input — add more detail if possible'
+                      : `${pastedText.length.toLocaleString()} characters · looks good`}
+                </p>
+                <span style={{ fontSize: 12, color: pastedText.length > 200 ? 'var(--green)' : 'var(--ink30)', fontWeight: 500 }}>
+                  {pastedText.length > 200 ? '✓ Ready' : ''}
+                </span>
+              </div>
+              {pastedText.length === 0 && (
+                <button
+                  onClick={() => {
+                    setPastedText(SAMPLE_INPUT);
+                    setSampleUsed(true);
+                    setTimeout(() => setSampleUsed(false), 2000);
+                  }}
+                  style={{
+                    marginTop: 8, height: 30, padding: '0 14px',
+                    background: sampleUsed ? 'var(--green-bg)' : 'var(--dreamy)',
+                    border: `1.5px solid ${sampleUsed ? 'var(--green)' : 'var(--purps)'}`,
+                    borderRadius: 8, fontSize: 12, fontWeight: 600,
+                    color: sampleUsed ? '#166534' : 'var(--purps)',
+                    cursor: 'pointer', transition: 'all 200ms',
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                  }}
+                >
+                  {sampleUsed ? '✓ Sample loaded' : '← Try a sample input'}
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -320,7 +351,15 @@ export function UploadScreen() {
                   ))}
                 </div>
                 <div style={{ padding: '8px 14px', borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
-                  <p style={{ fontSize: 11, color: 'var(--ink60)' }}>Can't find a supplier? <a href="#" style={{ color: 'var(--purps)' }}>Add new supplier →</a></p>
+                  <p style={{ fontSize: 11, color: 'var(--ink60)' }}>
+                    Can't find a supplier?{' '}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setSupplierOpen(false); setSupplierNotFoundModal(true); }}
+                      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--purps)', fontSize: 11, fontWeight: 600 }}
+                    >
+                      Add new supplier →
+                    </button>
+                  </p>
                 </div>
               </div>
             )}
@@ -362,6 +401,63 @@ export function UploadScreen() {
           </button>
         </div>
       </div>
+
+      {/* Supplier not found modal */}
+      {supplierNotFoundModal && (
+        <div
+          onClick={() => setSupplierNotFoundModal(false)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="fade-in"
+            style={{
+              background: '#fff', borderRadius: 16, padding: '32px 28px',
+              maxWidth: 420, width: '90%', boxShadow: '0 16px 48px rgba(0,0,0,0.18)',
+            }}
+          >
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--dreamy)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+              <Search size={20} color="var(--purps)" />
+            </div>
+            <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
+              Supplier not found
+            </h3>
+            <p style={{ fontSize: 14, color: 'var(--ink60)', lineHeight: 1.6, marginBottom: 24 }}>
+              This supplier isn't in the system yet. You'll need to register them in the Supplier Management system before creating a listing.
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setSupplierNotFoundModal(false)}
+                style={{
+                  height: 38, padding: '0 18px', background: '#fff',
+                  border: '1.5px solid var(--border)', borderRadius: 8,
+                  fontSize: 13, fontWeight: 600, color: 'var(--slate)', cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setSupplierNotFoundModal(false);
+                  // Redirect to supplier management system when integrated
+                  window.open('about:blank', '_blank');
+                }}
+                style={{
+                  height: 38, padding: '0 18px', background: 'var(--purps)',
+                  border: 'none', borderRadius: 8,
+                  fontSize: 13, fontWeight: 600, color: '#fff', cursor: 'pointer',
+                }}
+              >
+                Go to Supplier Management →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

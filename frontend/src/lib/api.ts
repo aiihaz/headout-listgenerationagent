@@ -30,10 +30,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
-  createRun(supplierInput: string): Promise<{ run_id: string; status: string }> {
+  createRun(supplierInput: string, experienceName?: string): Promise<{ run_id: string; status: string }> {
     return request('/api/v1/runs', {
       method: 'POST',
-      body: JSON.stringify({ supplier_input: supplierInput }),
+      body: JSON.stringify({ supplier_input: supplierInput, experience_name: experienceName || undefined }),
     });
   },
 
