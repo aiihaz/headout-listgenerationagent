@@ -152,6 +152,7 @@ Located at `backend/`. Run with `uvicorn backend.main:app --reload`. Requires no
 | `backend/tests/__init__.py` | Package marker | Done |
 | `backend/tests/test_pipeline_service.py` | 3 backend invariant tests (no Supabase, no OpenAI key required) — all passing | Done — 2026-05-03 |
 | `backend/tests/test_serper_agent.py` | 9 Serper agent tests: blank key skip, timeout skip, 401 skip, 429 skip, bad JSON skip, PAA parse, pipeline-continues-on-skip, output format unchanged when skipped, review prompt omits check 9 when skipped | Done — 2026-05-03 |
+| `backend/tests/test_status_endpoint_regression.py` | 2 regression tests for ISSUE-001: verifies `supplier_name` absent from select, graceful None on missing run | Done — 2026-05-04 |
 
 **Changes to existing files:**
 - `backend/routers/runs.py` — `POST /api/v1/runs` now fires `launch_pipeline` as a `BackgroundTask`; added `POST /runs/:id/regenerate` (targeted section regen) and `POST /runs/:id/images` (file upload)
@@ -511,6 +512,35 @@ All 6 screens built, verified in browser, production build passing. See "Fronten
 ---
 
 ## Session History
+
+### Session 19 — QA Pass: /status 404 bug + regression test (2026-05-04)
+
+Ran `/qa` in diff-aware mode against the `staging` branch (no URL specified — scoped to the 5 most recent commits). Health score 82 → 90.
+
+**ISSUE-001 — `/status` endpoint returns 404 for all runs [CRITICAL] ✅ FIXED**
+
+Every call to `GET /api/v1/runs/{id}/status` returned HTTP 404, meaning ProcessingScreen could never poll for updates — users would see the spinner forever with no transition to ReviewScreen.
+
+Root cause: `get_run_status()` selected `supplier_name` from the Supabase `runs` table. That column does not exist in the schema (only `supplier_input` exists). Supabase returned PostgREST error `42703 column not found`. The `except` block caught it and returned `None` with no filesystem fallback, so the router raised HTTP 404.
+
+Fix: removed `supplier_name` from the `.select()` call in `get_run_status()`. ProcessingScreen only needs `status` and `error_message` at the polling stage.
+
+- **Before:** `.select("id,status,error_message,supplier_name")`
+- **After:** `.select("id,status,error_message")`
+
+**ISSUE-002 — `create.webp` preloaded globally but only used on login screen [LOW] ⏸ DEFERRED**
+
+`frontend/index.html` has `<link rel="preload" as="image" href="/create.webp">`. Image is only used in `LoginScreen.tsx`. Every authenticated page fires a console warning about an unused preload. No functional impact. Fix: remove the preload tag from `index.html` or lazy-load inside `LoginScreen.tsx`.
+
+**QA report:** `.gstack/qa-reports/qa-report-localhost-5173-2026-05-04.md`
+
+**Files modified:**
+- `backend/services/supabase_service.py` — removed `supplier_name` from `get_run_status()` select
+- `backend/tests/test_status_endpoint_regression.py` — new; 2 regression tests verifying the fix
+
+**Commits:** `4a05a0b` (fix), `7354b99` (regression test)
+
+---
 
 ### Session 18 — Review Quality Fixes: associate_action pill, real flag counts, regen context (2026-05-04)
 
