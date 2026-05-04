@@ -1,5 +1,12 @@
 import { getSessionToken } from './supabase';
-import type { ApiRun, RunDetail } from '../types';
+import type { ApiRun, RunDetail, RunStatus } from '../types';
+
+export interface RunStatusResponse {
+  id: string;
+  status: RunStatus;
+  error_message?: string | null;
+  supplier_name?: string | null;
+}
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
@@ -28,6 +35,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ supplier_input: supplierInput }),
     });
+  },
+
+  getRunStatus(runId: string): Promise<RunStatusResponse> {
+    return request(`/api/v1/runs/${runId}/status`);
   },
 
   getRun(runId: string): Promise<RunDetail> {

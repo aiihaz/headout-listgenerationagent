@@ -74,6 +74,25 @@ async def write_artifact(run_id: str, artifact_type: str, payload: dict) -> None
     await supabase_write_with_retry("run_artifacts", data, operation="upsert")
 
 
+async def get_run_status(run_id: str) -> Optional[dict[str, Any]]:
+    client = _get_client()
+    if client is None:
+        runs = _filesystem_list_runs(limit=500)
+        return next((r for r in runs if r.get("id") == run_id), None)
+    try:
+        resp = (
+            client.table("runs")
+            .select("id,status,error_message,supplier_name")
+            .eq("id", run_id)
+            .single()
+            .execute()
+        )
+        return dict(resp.data) if resp.data else None
+    except Exception as exc:
+        logger.error("get_run_status failed for %s: %s", run_id, exc)
+        return None
+
+
 async def get_run_with_artifacts(run_id: str) -> Optional[dict[str, Any]]:
     client = _get_client()
     if client is None:

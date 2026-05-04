@@ -75,8 +75,8 @@ export function ProcessingScreen() {
     const poll = async () => {
       while (!cancelled) {
         try {
-          const run = await api.getRun(runId);
-          const status = run.status as RunStatus;
+          const run = await api.getRunStatus(runId);
+          const status = run.status;
           const s = statusToStage(status);
           setStage(s);
           setContextLine(statusToContextLine(status, run.error_message));

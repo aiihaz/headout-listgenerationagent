@@ -56,6 +56,17 @@ async def list_runs(
     return await supabase_service.list_runs(limit=limit)
 
 
+@router.get("/runs/{run_id}/status")
+async def get_run_status(
+    run_id: str,
+    user: dict = Depends(get_current_user),
+) -> dict[str, Any]:
+    run = await supabase_service.get_run_status(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return run
+
+
 @router.get("/runs/{run_id}")
 async def get_run(
     run_id: str,
