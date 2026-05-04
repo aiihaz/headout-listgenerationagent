@@ -5,6 +5,7 @@ import {
   ArrowRight, X, Check, Plus,
 } from 'lucide-react';
 import { FieldComponent } from '../components/FieldComponent';
+import { PricingTable } from '../components/PricingTable';
 import { api } from '../lib/api';
 import { mapRunToReviewData } from '../lib/mapRunToReviewData';
 import type { FieldData, FieldStatus, ReviewData } from '../types';
@@ -16,9 +17,21 @@ const EMPTY_REVIEW_DATA: ReviewData = {
   inclusions: [],
   exclusions: [],
   faqs: [],
+  pricing: [],
   cancellation: { id: 'cancel', label: 'Cancellation policy', value: '', status: 'ready', source: null },
   seoNote: { id: 'seo', label: 'SEO tags', value: '', status: 'ready', source: null },
 };
+
+function pricingStatus(variants: ReviewData['pricing']): FieldStatus {
+  if (variants.length === 0) return 'review';
+  for (const v of variants) {
+    if (v.tiers.length === 0) return 'review';
+    const hasAdult = v.tiers.some(t => t.ageGroup === 'ADULT' || t.ageGroup === 'GROUP');
+    if (!hasAdult) return 'review';
+    if (v.tiers.some(t => !t.isFree && t.pricePerUnit == null)) return 'caveat';
+  }
+  return 'ready';
+}
 
 function buildFlagList(data: ReviewData) {
   const list: { label: string; reason: string; id: string; type: 'review' | 'caveat' | 'associate_action' }[] = [];
@@ -33,6 +46,15 @@ function buildFlagList(data: ReviewData) {
   data.inclusions.forEach(i => push(i, 's-inclusions'));
   data.exclusions.forEach(e => push(e, 's-exclusions'));
   data.faqs.forEach(f => push(f, 's-faqs'));
+  const ps = pricingStatus(data.pricing);
+  if (ps !== 'ready') {
+    list.push({
+      label: 'Pricing',
+      reason: ps === 'review' ? 'No adult pricing found — confirm with supplier' : 'Some price tiers are missing',
+      id: 's-pricing',
+      type: ps === 'review' ? 'review' : 'caveat',
+    });
+  }
   push(data.cancellation, 's-cancel');
   push(data.seoNote, 's-seo');
   return list;
@@ -67,7 +89,9 @@ function countFlags(data: ReviewData): number {
     data.title, data.descHook, ...data.highlights, ...data.inclusions,
     ...data.exclusions, ...data.faqs, data.cancellation, data.seoNote,
   ];
-  return allFields.filter(f => f.status === 'review' || f.status === 'caveat' || f.status === 'associate_action').length;
+  const fieldFlags = allFields.filter(f => f.status === 'review' || f.status === 'caveat' || f.status === 'associate_action').length;
+  const ps = pricingStatus(data.pricing);
+  return fieldFlags + (ps !== 'ready' ? 1 : 0);
 }
 
 export function ReviewScreen() {
@@ -138,6 +162,7 @@ export function ReviewScreen() {
     { id: 's-inclusions', label: 'Inclusions', status: resolvedOrActual('s-inclusions', reviewData.inclusions.find(i => i.status !== 'ready')?.status ?? 'ready') },
     { id: 's-exclusions', label: 'Exclusions', status: resolvedOrActual('s-exclusions', reviewData.exclusions.find(e => e.status !== 'ready')?.status ?? 'ready') },
     { id: 's-faqs', label: 'FAQs', status: resolvedOrActual('s-faqs', reviewData.faqs.find(f => f.status !== 'ready')?.status ?? 'ready', 2) },
+    { id: 's-pricing', label: 'Pricing', status: resolvedOrActual('s-pricing', pricingStatus(reviewData.pricing)) },
     { id: 's-seo', label: 'SEO tags', status: resolvedOrActual('s-seo', reviewData.seoNote.status) },
     { id: 's-cancel', label: 'Cancellation', status: resolvedOrActual('s-cancel', reviewData.cancellation.status) },
   ];
@@ -442,6 +467,10 @@ export function ReviewScreen() {
             <FieldComponent key={f.id} field={f} showSource={showSourceQuotes}
               onResolve={f.status !== 'ready' ? () => markSectionResolved('s-faqs') : undefined} />
           ))}
+        </Section>
+
+        <Section id="s-pricing">
+          <PricingTable variants={reviewData.pricing} onResolve={() => markSectionResolved('s-pricing')} />
         </Section>
 
         <Section id="s-seo">

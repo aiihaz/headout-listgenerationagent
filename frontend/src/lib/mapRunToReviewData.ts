@@ -1,4 +1,4 @@
-import type { FieldData, FieldStatus, ReviewBlocker, ReviewWarning, ReviewData } from '../types';
+import type { FieldData, FieldStatus, ReviewBlocker, ReviewWarning, ReviewData, PricingTier, PricingVariant, PriceUnit } from '../types';
 
 function fieldStatus(
   fieldPath: string,
@@ -31,6 +31,16 @@ function sourceLabel(sources: Record<string, string>, path: string): string | nu
   if (type === 'DEFAULT') return 'Pipeline default';
   if (type === 'AGENT-GENERATED') return 'AI-generated';
   return type;
+}
+
+function pricingTierLabel(ageGroup: string, minAge?: number | null, maxAge?: number | null): string {
+  const base: Record<string, string> = { ADULT: 'Adult', CHILD: 'Child', YOUTH: 'Youth', INFANT: 'Infant', SENIOR: 'Senior' };
+  const name = base[ageGroup] ?? ageGroup;
+  if (ageGroup === 'INFANT' && maxAge != null) return `${name} (under ${maxAge + 1})`;
+  if (minAge != null && maxAge != null) return `${name} (${minAge}–${maxAge})`;
+  if (minAge != null) return `${name} (${minAge}+)`;
+  if (maxAge != null) return `${name} (under ${maxAge + 1})`;
+  return name;
 }
 
 function formatCancelType(type: string): string {
@@ -134,6 +144,28 @@ export function mapRunToReviewData(
       })()
     : 'Not specified';
 
+  const rawPricingType = (intakePayload.pricingType as string | undefined) === 'PER_GROUP' ? 'PER_GROUP' : 'PER_PERSON';
+  const maxGroupSize = intakePayload.maxGroupSize as number | null | undefined;
+  const rawVariants = (intakePayload.variants as Record<string, unknown>[] | undefined) ?? [];
+  const pricing: PricingVariant[] = rawVariants.map(v => {
+    const rawTiers = (v.pricing as Record<string, unknown>[] | undefined) ?? [];
+    const tiers: PricingTier[] = rawTiers.map(p => ({
+      ageGroup: String(p.ageGroup ?? ''),
+      label: pricingTierLabel(String(p.ageGroup ?? ''), p.minAge as number | null, p.maxAge as number | null),
+      pricePerUnit: (p.pricePerUnit as number | null) ?? null,
+      isFree: (p.pricePerUnit as number | null) === 0,
+      currencyCode: String(p.currencyCode ?? 'USD'),
+    }));
+    const unit: PriceUnit = rawPricingType === 'PER_GROUP' ? 'group' : 'person';
+    return {
+      name: String(v.name ?? 'Standard'),
+      pricingType: rawPricingType,
+      unit,
+      maxGroupSize,
+      tiers,
+    };
+  });
+
   const seoObj = listing.seo as Record<string, unknown> | undefined;
   const tags: string[] = (seoObj?.tags as string[]) ?? [];
 
@@ -162,6 +194,7 @@ export function mapRunToReviewData(
     inclusions,
     exclusions,
     faqs,
+    pricing,
     cancellation: {
       id: 'cancel',
       label: 'Cancellation policy',

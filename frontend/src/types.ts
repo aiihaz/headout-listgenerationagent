@@ -115,6 +115,24 @@ export interface FieldData {
   action?: 'regenerate' | 'associate_action';
 }
 
+export type PriceUnit = 'person' | 'group' | 'hour' | 'day' | 'ride' | 'session';
+
+export interface PricingTier {
+  ageGroup: string;
+  label: string;
+  pricePerUnit: number | null;
+  isFree: boolean;
+  currencyCode: string;
+}
+
+export interface PricingVariant {
+  name: string;
+  pricingType: 'PER_PERSON' | 'PER_GROUP';
+  unit: PriceUnit;
+  maxGroupSize?: number | null;
+  tiers: PricingTier[];
+}
+
 export interface ReviewData {
   title: FieldData;
   descHook: FieldData;
@@ -122,6 +140,7 @@ export interface ReviewData {
   inclusions: FieldData[];
   exclusions: FieldData[];
   faqs: FieldData[];
+  pricing: PricingVariant[];
   cancellation: FieldData;
   seoNote: FieldData;
 }
