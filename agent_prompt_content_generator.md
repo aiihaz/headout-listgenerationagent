@@ -389,14 +389,15 @@ Return an error object (not a listing) if:
 }
 ```
 
-Stop conditions (check `_meta.publish_blocked`, NOT individual `ambiguity_flags[*].blocks_publish`):
-- `_meta.publish_blocked` is `true` AND `variants[0].pricing` has no ADULT entry — you cannot write variant descriptions without knowing the pricing tier
+Stop conditions:
 - The `tourType` is not one of `GUIDED_TOUR`, `SHOW_OR_EVENT`, `ATTRACTION_TICKET`, `DESERT_SAFARI`, `COMBO_TICKET` — classification must be resolved first
 - Fewer than 3 activities or features are present in the intake data — not enough source material to write honest, specific copy
 
-IMPORTANT: `blocks_publish: true` inside an `ambiguity_flags` entry is NOT a stop signal. It means that specific field must be resolved before the listing goes live — it does not prevent content generation. Generate the full listing and note the conditional item in `publish_verdict.warnings[]`.
+IMPORTANT: Missing pricing (`variants[0].pricing` absent or no ADULT entry) is NOT a stop condition. Pricing is collected separately by the associate in the review workflow. Generate the full listing and add `"pricing_missing"` to `publish_verdict.warnings[]`. Do not reference specific prices in copy unless a confirmed price exists in the intake.
 
-Do NOT stop for: missing images, missing guide language, CONDITIONAL inclusions, DEFERRED fields, or any `ambiguity_flags` entry regardless of its `blocks_publish` value. These are handled in copy with appropriate hedging language and flagged in `publish_verdict.warnings[]`.
+IMPORTANT: `_meta.publish_blocked: true` is NOT a stop signal for content generation. It means the listing cannot go live yet — it does not prevent you from writing copy. Generate the full listing regardless and surface all blocking issues in `publish_verdict.warnings[]`.
+
+Do NOT stop for: missing pricing, missing images, missing guide language, CONDITIONAL inclusions, DEFERRED fields, or any `ambiguity_flags` entry regardless of its `blocks_publish` value. These are handled in copy with appropriate hedging language and flagged in `publish_verdict.warnings[]`.
 
 ---
 
