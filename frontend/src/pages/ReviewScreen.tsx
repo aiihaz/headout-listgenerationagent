@@ -21,9 +21,9 @@ const EMPTY_REVIEW_DATA: ReviewData = {
 };
 
 function buildFlagList(data: ReviewData) {
-  const list: { label: string; reason: string; id: string; type: 'review' | 'caveat' }[] = [];
+  const list: { label: string; reason: string; id: string; type: 'review' | 'caveat' | 'associate_action' }[] = [];
   const push = (f: FieldData, id: string) => {
-    if (f.status === 'review' || f.status === 'caveat') {
+    if (f.status === 'review' || f.status === 'caveat' || f.status === 'associate_action') {
       list.push({ label: f.label, reason: f.reason ?? f.caveat ?? 'Needs review', id, type: f.status });
     }
   };
@@ -39,7 +39,7 @@ function buildFlagList(data: ReviewData) {
 }
 
 function statusDot(s: FieldStatus) {
-  return s === 'review' ? 'var(--red)' : s === 'caveat' ? 'var(--amber)' : 'var(--green)';
+  return s === 'review' ? 'var(--red)' : s === 'associate_action' ? 'var(--orange)' : s === 'caveat' ? 'var(--amber)' : 'var(--green)';
 }
 
 interface SupplierMessageFieldProps { }
@@ -67,7 +67,7 @@ function countFlags(data: ReviewData): number {
     data.title, data.descHook, ...data.highlights, ...data.inclusions,
     ...data.exclusions, ...data.faqs, data.cancellation, data.seoNote,
   ];
-  return allFields.filter(f => f.status === 'review' || f.status === 'caveat').length;
+  return allFields.filter(f => f.status === 'review' || f.status === 'caveat' || f.status === 'associate_action').length;
 }
 
 export function ReviewScreen() {
@@ -255,13 +255,13 @@ export function ReviewScreen() {
                 onClick={() => { scrollTo(fl.id); setBannerExpanded(false); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10, background: '#fff',
-                  border: `1px solid ${fl.type === 'review' ? '#FCA5A5' : '#FDE68A'}`,
+                  border: `1px solid ${fl.type === 'review' ? '#FCA5A5' : fl.type === 'associate_action' ? '#FDBA74' : '#FDE68A'}`,
                   borderRadius: 8, padding: '8px 12px', cursor: 'pointer', textAlign: 'left', transition: 'background 120ms',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.background = fl.type === 'review' ? '#FFF5F5' : '#FFFBEB')}
+                onMouseEnter={e => (e.currentTarget.style.background = fl.type === 'review' ? '#FFF5F5' : fl.type === 'associate_action' ? '#FFF7ED' : '#FFFBEB')}
                 onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
               >
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: fl.type === 'review' ? 'var(--red)' : 'var(--amber)', flexShrink: 0 }} />
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: fl.type === 'review' ? 'var(--red)' : fl.type === 'associate_action' ? 'var(--orange)' : 'var(--amber)', flexShrink: 0 }} />
                 <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--slate)', minWidth: 120 }}>{fl.label}</span>
                 <span style={{ fontSize: 12, color: 'var(--ink60)', flex: 1 }}>{fl.reason}</span>
                 <ArrowRight size={13} color="var(--ink60)" style={{ flexShrink: 0 }} />
@@ -326,8 +326,8 @@ export function ReviewScreen() {
                 <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink60)', marginBottom: 2 }}>The following items need clarification from your side:</p>
                   {flagList.map((fl, i) => (
-                    <div key={fl.label} style={{ display: 'flex', gap: 10, padding: '10px 12px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8 }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--amber)', flexShrink: 0, marginTop: 1 }}>{i + 1}.</span>
+                    <div key={fl.label} style={{ display: 'flex', gap: 10, padding: '10px 12px', background: fl.type === 'associate_action' ? '#FFF7ED' : '#FFFBEB', border: `1px solid ${fl.type === 'associate_action' ? '#FDBA74' : '#FDE68A'}`, borderRadius: 8 }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: fl.type === 'associate_action' ? 'var(--orange)' : 'var(--amber)', flexShrink: 0, marginTop: 1 }}>{i + 1}.</span>
                       <div>
                         <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--slate)' }}>{fl.label}</p>
                         <p style={{ fontSize: 12, color: 'var(--ink60)', marginTop: 2, lineHeight: 1.5 }}>{fl.reason}</p>

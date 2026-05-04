@@ -11,8 +11,8 @@ const CACHE_KEY = 'dashboard_runs_cache';
 const STATUSES = ['All', 'Draft', 'Processing', 'In Review', 'Ready', 'Published', 'Failed'] as const;
 type StatusFilter = typeof STATUSES[number];
 
-function verdictFromStatus(status: ApiRun['status']): ListingRow['verdict'] {
-  if (status === 'ready_for_publish' || status === 'published' || status === 'approved') return 'ready';
+function verdictFromStatus(status: ApiRun['status'], flagCount?: number | null): ListingRow['verdict'] {
+  if (status === 'ready_for_publish' || status === 'published' || status === 'approved') return flagCount ? 'caveat' : 'ready';
   if (status === 'escalated_to_human' || status === 'regeneration_in_progress') return 'caveat';
   if (status === 'intake_failed' || status === 'generation_blocked') return 'review';
   return null;
@@ -41,7 +41,7 @@ function rowFromApiRun(run: ApiRun): ListingRow {
     experience: experienceName,
     city: '—',
     status: listingStatus,
-    verdict: verdictFromStatus(run.status),
+    verdict: verdictFromStatus(run.status, run.flag_count),
     flags: run.flag_count ?? null,
     updated: timeAgo(run.updated_at ?? run.created_at),
     assignee: 'IH',

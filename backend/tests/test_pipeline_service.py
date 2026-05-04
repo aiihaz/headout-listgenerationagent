@@ -37,7 +37,7 @@ def test_pipeline_blocked_on_orchestrator_exception():
     while not status_q.empty():
         collected.append(status_q.get_nowait())
 
-    assert ("generation_blocked", "OpenAI API timeout") in collected
+    assert ("generation_blocked", "OpenAI API timeout", None) in collected
     assert collected[-1] is None  # sentinel always pushed in finally block
 
 
