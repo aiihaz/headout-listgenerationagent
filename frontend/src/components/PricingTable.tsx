@@ -135,11 +135,19 @@ export function PricingTable({ variants, onResolve }: PricingTableProps) {
     const map: Record<string, Record<string, number | null>> = {};
     for (const v of variants) {
       map[v.name] = {};
-      for (const t of v.tiers) map[v.name][t.ageGroup] = null;
+      for (const t of v.tiers) map[v.name][t.ageGroup] = t.pricePerUnit ?? null;
     }
     return map;
   };
   const [editedPrices, setEditedPrices] = useState<Record<string, Record<string, number | null>>>(initPrices);
+
+  const isDirty = variants.some(v =>
+    v.tiers.some(t => {
+      const original = t.pricePerUnit ?? null;
+      const current = editedPrices[v.name]?.[t.ageGroup] ?? null;
+      return original !== current;
+    })
+  );
 
   const status: FieldStatus = resolved ? 'ready' : derivePricingStatus(variants);
   const activeUnit = unitOverride ?? (variants[0]?.unit ?? 'person');
@@ -150,7 +158,7 @@ export function PricingTable({ variants, onResolve }: PricingTableProps) {
 
   const handleSave = () => {
     setEditing(false);
-    if (status !== 'ready' && onResolve) {
+    if (isDirty && status !== 'ready' && onResolve) {
       setResolved(true);
       onResolve();
     }
@@ -223,10 +231,11 @@ export function PricingTable({ variants, onResolve }: PricingTableProps) {
             }}>
               <X size={12} /> Cancel
             </button>
-            <button onClick={handleSave} style={{
+            <button onClick={handleSave} disabled={!isDirty} style={{
               display: 'flex', alignItems: 'center', gap: 4, height: 26, padding: '0 10px',
               borderRadius: 6, border: '1px solid #86EFAC', background: 'var(--green-bg)',
-              fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#166534',
+              fontSize: 12, fontWeight: 600, cursor: isDirty ? 'pointer' : 'default',
+              color: '#166534', opacity: isDirty ? 1 : 0.4,
             }}>
               <Check size={12} /> Save
             </button>

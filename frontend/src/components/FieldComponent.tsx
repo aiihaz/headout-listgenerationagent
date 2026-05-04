@@ -18,7 +18,11 @@ export function FieldComponent({ field, showSource = true, onResolve }: FieldCom
   const [expanded, setExpanded] = useState(field.status === 'flag');
   const [resolved, setResolved] = useState(false);
   const [sourceOpen, setSourceOpen] = useState(false);
+  const [editStartVal, setEditStartVal] = useState('');
+  const [editStartTab, setEditStartTab] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const isDirty = editing && (val !== editStartVal || activeTab !== editStartTab);
 
   const status: FieldStatus = resolved ? 'ready' : field.status;
 
@@ -124,16 +128,17 @@ export function FieldComponent({ field, showSource = true, onResolve }: FieldCom
             }}>
               <X size={12} /> Cancel
             </button>
-            <button onClick={handleSave} style={{
+            <button onClick={handleSave} disabled={!isDirty} style={{
               display: 'flex', alignItems: 'center', gap: 4, height: 26, padding: '0 10px',
               borderRadius: 6, border: '1px solid #86EFAC', background: 'var(--green-bg)',
-              fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#166534',
+              fontSize: 12, fontWeight: 600, cursor: isDirty ? 'pointer' : 'default',
+              color: '#166534', opacity: isDirty ? 1 : 0.4,
             }}>
               <Check size={12} /> Save
             </button>
           </div>
         ) : (
-          <button onClick={() => setEditing(true)} style={{
+          <button onClick={() => { setEditStartVal(val); setEditStartTab(activeTab); setEditing(true); }} style={{
             display: 'flex', alignItems: 'center', gap: 4, height: 26, padding: '0 10px',
             borderRadius: 6, border: '1px solid var(--border)', background: '#fff',
             fontSize: 12, fontWeight: 500, cursor: 'pointer', color: 'var(--ink60)',
@@ -194,7 +199,7 @@ export function FieldComponent({ field, showSource = true, onResolve }: FieldCom
             rows={Math.max(2, val.split('\n').length)}
           />
         ) : (
-          <p onDoubleClick={() => setEditing(true)} style={{ fontSize: 14, lineHeight: 1.6, minHeight: 40, cursor: 'default' }}>
+          <p style={{ fontSize: 14, lineHeight: 1.6, minHeight: 40, cursor: 'default' }}>
             {val}
           </p>
         )}
@@ -220,7 +225,7 @@ export function FieldComponent({ field, showSource = true, onResolve }: FieldCom
               {field.source && <p style={{ fontSize: 12, color: 'var(--ink60)', fontStyle: 'italic', marginBottom: 10 }}>"{field.source}"</p>}
               {!resolved && (
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  <button onClick={() => setEditing(true)} style={{
+                  <button onClick={() => { setEditStartVal(val); setEditStartTab(activeTab); setEditing(true); }} style={{
                     height: 30, padding: '0 12px', background: '#fff', color: 'var(--slate)',
                     border: '1px solid var(--border)', borderRadius: 6, fontSize: 12, fontWeight: 500,
                     cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,

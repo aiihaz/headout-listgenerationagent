@@ -221,10 +221,10 @@ export function mapRunToReviewData(
       id: 'seo',
       label: 'SEO tags',
       value: tags.join(', ') || (seoObj?.metaDescription as string) || '',
-      status: fieldStatus('seo', blockers, []),
-      reason: fixReason('seo', blockers, []),
+      status: 'ready',
+      reason: undefined,
       source: null,
-      action: fieldAction('seo', blockers),
+      action: undefined,
     },
   };
 }
