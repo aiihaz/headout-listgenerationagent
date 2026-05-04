@@ -56,6 +56,10 @@ export const api = {
     });
   },
 
+  publishRun(runId: string): Promise<{ run_id: string; status: string }> {
+    return request(`/api/v1/runs/${runId}/publish`, { method: 'POST' });
+  },
+
   regenerateSection(runId: string, section: string, fixInstruction: string): Promise<{ status: string }> {
     return request(`/api/v1/runs/${runId}/regenerate`, {
       method: 'POST',

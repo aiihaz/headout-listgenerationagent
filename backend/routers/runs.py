@@ -114,6 +114,20 @@ async def regenerate_section(
     return {"run_id": run_id, "status": "regeneration_in_progress", "section": body.section}
 
 
+@router.post("/runs/{run_id}/publish")
+async def publish_run(
+    run_id: str,
+    user: dict = Depends(get_current_user),
+) -> dict[str, Any]:
+    run = await supabase_service.get_run_status(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    ok = await supabase_service.publish_run(run_id)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Failed to publish run")
+    return {"run_id": run_id, "status": "published"}
+
+
 @router.post("/runs/{run_id}/images")
 async def upload_image(
     run_id: str,

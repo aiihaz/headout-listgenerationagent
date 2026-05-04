@@ -5,22 +5,18 @@ function fieldStatus(
   blockers: ReviewBlocker[],
   warnings: ReviewWarning[],
 ): FieldStatus {
-  const blocker = blockers.find(b => b.field.includes(fieldPath));
-  if (blocker) return blocker.action_required === 'associate_action' ? 'associate_action' : 'review';
-  if (warnings.some(w => w.field.includes(fieldPath))) return 'caveat';
+  if (blockers.some(b => b.field.includes(fieldPath))) return 'flag';
+  if (warnings.some(w => w.field.includes(fieldPath))) return 'flag';
   return 'ready';
 }
 
-function fixReason(fieldPath: string, blockers: ReviewBlocker[]): string | undefined {
-  return blockers.find(b => b.field.includes(fieldPath))?.fix_instruction;
+function fixReason(fieldPath: string, blockers: ReviewBlocker[], warnings: ReviewWarning[]): string | undefined {
+  return blockers.find(b => b.field.includes(fieldPath))?.fix_instruction
+    ?? warnings.find(w => w.field.includes(fieldPath))?.message;
 }
 
 function fieldAction(fieldPath: string, blockers: ReviewBlocker[]): ReviewBlocker['action_required'] | undefined {
   return blockers.find(b => b.field.includes(fieldPath))?.action_required;
-}
-
-function fixCaveat(fieldPath: string, warnings: ReviewWarning[]): string | undefined {
-  return warnings.find(w => w.field.includes(fieldPath))?.message;
 }
 
 function sourceLabel(sources: Record<string, string>, path: string): string | null {
@@ -88,8 +84,7 @@ export function mapRunToReviewData(
     label: `Highlight ${i + 1}`,
     value: h,
     status: fieldStatus(`highlights[${i}]`, blockers, warnings),
-    reason: fixReason(`highlights[${i}]`, blockers),
-    caveat: fixCaveat(`highlights[${i}]`, warnings),
+    reason: fixReason(`highlights[${i}]`, blockers, warnings),
     source: sourceLabel(sources, 'highlights'),
     action: fieldAction(`highlights[${i}]`, blockers),
   } satisfies FieldData));
@@ -99,7 +94,7 @@ export function mapRunToReviewData(
     label: `Inclusion ${i + 1}`,
     value: inc,
     status: fieldStatus(`inclusions[${i}]`, blockers, warnings),
-    reason: fixReason(`inclusions[${i}]`, blockers),
+    reason: fixReason(`inclusions[${i}]`, blockers, warnings),
     source: sourceLabel(sources, 'inclusions'),
     action: fieldAction(`inclusions[${i}]`, blockers),
   } satisfies FieldData));
@@ -109,7 +104,7 @@ export function mapRunToReviewData(
     label: `Exclusion ${i + 1}`,
     value: ex,
     status: fieldStatus(`exclusions[${i}]`, blockers, warnings),
-    reason: fixReason(`exclusions[${i}]`, blockers),
+    reason: fixReason(`exclusions[${i}]`, blockers, warnings),
     source: sourceLabel(sources, 'exclusions'),
     action: fieldAction(`exclusions[${i}]`, blockers),
   } satisfies FieldData));
@@ -122,7 +117,7 @@ export function mapRunToReviewData(
       label: `FAQ ${i + 1} — Question`,
       value: faq.question,
       status: fieldStatus(`faqs[${i}].question`, blockers, warnings),
-      reason: fixReason(`faqs[${i}].question`, blockers),
+      reason: fixReason(`faqs[${i}].question`, blockers, warnings),
       source: faq.paa_source
         ? `Google users also ask: "${faq.paa_source}"`
         : sourceLabel(sources, 'faqs'),
@@ -133,7 +128,7 @@ export function mapRunToReviewData(
       label: `FAQ ${i + 1} — Answer`,
       value: faq.answer,
       status: fieldStatus(`faqs[${i}].answer`, blockers, warnings),
-      reason: fixReason(`faqs[${i}].answer`, blockers),
+      reason: fixReason(`faqs[${i}].answer`, blockers, warnings),
       source: faq.paa_source
         ? `Google users also ask: "${faq.paa_source}"`
         : sourceLabel(sources, 'faqs'),
@@ -149,7 +144,6 @@ export function mapRunToReviewData(
   const cancelText = (() => {
     if (desc) return desc;
     if (Array.isArray(cancelTiers) && cancelTiers.length > 0) return cancelTiersToText(cancelTiers);
-    // backward compat: old runs with single refundPercentage/cutoffHours
     const pct = typeof cancellationPolicy.refundPercentage === 'number' ? cancellationPolicy.refundPercentage : undefined;
     const hours = typeof cancellationPolicy.cutoffHours === 'number' ? cancellationPolicy.cutoffHours : undefined;
     const hoursStr = hours != null ? `${hours}h` : '';
@@ -161,7 +155,6 @@ export function mapRunToReviewData(
     if (cancelType) return formatCancelType(cancelType);
     return 'Not specified';
   })();
-  // TIERED with no description and no tiers = incomplete data, flag for human review
   const cancelIncomplete = cancelType === 'TIERED' && !desc && (!Array.isArray(cancelTiers) || cancelTiers.length === 0);
 
   const rawPricingType = (intakePayload.pricingType as string | undefined) === 'PER_GROUP' ? 'PER_GROUP' : 'PER_PERSON';
@@ -195,8 +188,7 @@ export function mapRunToReviewData(
       options: titleOptions.length > 1 ? titleOptions : undefined,
       value: titleOptions.length === 1 ? titleOptions[0] : undefined,
       status: fieldStatus('listing.title', blockers, warnings),
-      reason: fixReason('listing.title', blockers),
-      caveat: fixCaveat('listing.title', warnings),
+      reason: fixReason('listing.title', blockers, warnings),
       source: sourceLabel(sources, 'productName'),
       action: fieldAction('listing.title', blockers),
     },
@@ -205,8 +197,7 @@ export function mapRunToReviewData(
       options: descOptions.length > 1 ? descOptions : undefined,
       value: descOptions.length === 1 ? descOptions[0] : undefined,
       status: fieldStatus('listing.description', blockers, warnings),
-      reason: fixReason('listing.description', blockers),
-      caveat: fixCaveat('listing.description', warnings),
+      reason: fixReason('listing.description', blockers, warnings),
       source: sourceLabel(sources, 'description'),
       action: fieldAction('listing.description', blockers),
     },
@@ -219,8 +210,10 @@ export function mapRunToReviewData(
       id: 'cancel',
       label: 'Cancellation policy',
       value: cancelText,
-      status: cancelIncomplete ? 'associate_action' : fieldStatus('cancellationPolicy', blockers, warnings),
-      reason: cancelIncomplete ? 'Tiered policy detected but no tier details were extracted. Update manually or raise with supplier.' : fixReason('cancellationPolicy', blockers),
+      status: cancelIncomplete ? 'flag' : fieldStatus('cancellationPolicy', blockers, warnings),
+      reason: cancelIncomplete
+        ? 'Tiered policy detected but no tier details were extracted. Update manually or raise with supplier.'
+        : fixReason('cancellationPolicy', blockers, warnings),
       source: sourceLabel(sources, 'cancellationPolicy'),
       action: cancelIncomplete ? 'associate_action' : fieldAction('cancellationPolicy', blockers),
     },
@@ -229,7 +222,7 @@ export function mapRunToReviewData(
       label: 'SEO tags',
       value: tags.join(', ') || (seoObj?.metaDescription as string) || '',
       status: fieldStatus('seo', blockers, []),
-      reason: fixReason('seo', blockers),
+      reason: fixReason('seo', blockers, []),
       source: null,
       action: fieldAction('seo', blockers),
     },

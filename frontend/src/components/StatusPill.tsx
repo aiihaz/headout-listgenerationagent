@@ -9,14 +9,12 @@ interface StatusPillProps {
 }
 
 const STATUS_CONFIG: Record<StatusPillStatus, { dot: string; bg: string; label: string }> = {
-  ready:            { dot: 'var(--green)',   bg: 'var(--green-bg)',  label: 'Ready' },
-  caveat:           { dot: 'var(--amber)',   bg: 'var(--amber-bg)',  label: 'Caveat added' },
-  review:           { dot: 'var(--red)',     bg: 'var(--red-bg)',    label: 'Needs review' },
-  associate_action: { dot: 'var(--orange)',  bg: 'var(--orange-bg)', label: 'Needs your input' },
-  processing:       { dot: 'var(--purps)',   bg: 'var(--dreamy)',    label: 'Processing' },
-  published:        { dot: 'var(--green)',   bg: 'var(--green-bg)',  label: 'Published' },
-  draft:            { dot: '#B3B3B3',        bg: 'var(--ink10)',     label: 'Draft' },
-  failed:           { dot: 'var(--red)',     bg: 'var(--red-bg)',    label: 'Failed' },
+  ready:      { dot: 'var(--green)',  bg: 'var(--green-bg)', label: 'Ready' },
+  flag:       { dot: 'var(--amber)',  bg: 'var(--amber-bg)', label: 'Flagged' },
+  processing: { dot: 'var(--purps)', bg: 'var(--dreamy)',    label: 'Processing' },
+  published:  { dot: 'var(--green)', bg: 'var(--green-bg)', label: 'Published' },
+  draft:      { dot: '#B3B3B3',      bg: 'var(--ink10)',    label: 'Draft' },
+  failed:     { dot: 'var(--red)',   bg: 'var(--red-bg)',   label: 'Failed' },
 };
 
 export function StatusPill({ status, tooltip }: StatusPillProps) {

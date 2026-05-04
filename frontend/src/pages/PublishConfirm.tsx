@@ -12,7 +12,13 @@ const CHECKLIST = [
 export function PublishConfirm() {
   const { id: runId } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const onConfirm = () => navigate(`/listings/${runId}/published`);
+  const [publishing, setPublishing] = useState(false);
+  const onConfirm = async () => {
+    if (!runId) return;
+    setPublishing(true);
+    try { await api.publishRun(runId); } catch { /* non-fatal — navigate regardless */ }
+    navigate(`/listings/${runId}/published`);
+  };
   const onEdit = () => navigate(`/listings/${runId}/review`);
   const [checks, setChecks] = useState([false, false, false]);
   const allChecked = checks.every(Boolean);
@@ -109,14 +115,14 @@ export function PublishConfirm() {
             }}>
               Edit listing
             </button>
-            <button onClick={onConfirm} disabled={!allChecked} style={{
-              flex: 2, height: 44, background: allChecked ? 'var(--purps)' : 'var(--ink30)',
+            <button onClick={onConfirm} disabled={!allChecked || publishing} style={{
+              flex: 2, height: 44, background: allChecked && !publishing ? 'var(--purps)' : 'var(--ink30)',
               color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600,
-              cursor: allChecked ? 'pointer' : 'not-allowed',
+              cursor: allChecked && !publishing ? 'pointer' : 'not-allowed',
               transition: 'background 200ms',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}>
-              <Send size={15} color="#fff" /> Publish now
+              <Send size={15} color="#fff" /> {publishing ? 'Publishing…' : 'Publish now'}
             </button>
           </div>
         </div>

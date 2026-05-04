@@ -23,21 +23,21 @@ const EMPTY_REVIEW_DATA: ReviewData = {
 };
 
 function pricingStatus(variants: ReviewData['pricing']): FieldStatus {
-  if (variants.length === 0) return 'review';
+  if (variants.length === 0) return 'flag';
   for (const v of variants) {
-    if (v.tiers.length === 0) return 'review';
+    if (v.tiers.length === 0) return 'flag';
     const hasAdult = v.tiers.some(t => t.ageGroup === 'ADULT' || t.ageGroup === 'GROUP');
-    if (!hasAdult) return 'review';
-    if (v.tiers.some(t => !t.isFree && t.pricePerUnit == null)) return 'caveat';
+    if (!hasAdult) return 'flag';
+    if (v.tiers.some(t => !t.isFree && t.pricePerUnit == null)) return 'flag';
   }
   return 'ready';
 }
 
 function buildFlagList(data: ReviewData) {
-  const list: { label: string; reason: string; id: string; type: 'review' | 'caveat' | 'associate_action' }[] = [];
+  const list: { label: string; reason: string; id: string }[] = [];
   const push = (f: FieldData, id: string) => {
-    if (f.status === 'review' || f.status === 'caveat' || f.status === 'associate_action') {
-      list.push({ label: f.label, reason: f.reason ?? f.caveat ?? 'Needs review', id, type: f.status });
+    if (f.status === 'flag') {
+      list.push({ label: f.label, reason: f.reason ?? 'Needs attention', id });
     }
   };
   push(data.title, 's-title');
@@ -47,13 +47,8 @@ function buildFlagList(data: ReviewData) {
   data.exclusions.forEach(e => push(e, 's-exclusions'));
   data.faqs.forEach(f => push(f, 's-faqs'));
   const ps = pricingStatus(data.pricing);
-  if (ps !== 'ready') {
-    list.push({
-      label: 'Pricing',
-      reason: ps === 'review' ? 'No adult pricing found — confirm with supplier' : 'Some price tiers are missing',
-      id: 's-pricing',
-      type: ps === 'review' ? 'review' : 'caveat',
-    });
+  if (ps === 'flag') {
+    list.push({ label: 'Pricing', reason: 'Pricing data is incomplete — confirm with supplier', id: 's-pricing' });
   }
   push(data.cancellation, 's-cancel');
   push(data.seoNote, 's-seo');
@@ -61,7 +56,7 @@ function buildFlagList(data: ReviewData) {
 }
 
 function statusDot(s: FieldStatus) {
-  return s === 'review' ? 'var(--red)' : s === 'associate_action' ? 'var(--orange)' : s === 'caveat' ? 'var(--amber)' : 'var(--green)';
+  return s === 'flag' ? 'var(--amber)' : 'var(--green)';
 }
 
 interface SupplierMessageFieldProps { }
@@ -89,9 +84,8 @@ function countFlags(data: ReviewData): number {
     data.title, data.descHook, ...data.highlights, ...data.inclusions,
     ...data.exclusions, ...data.faqs, data.cancellation, data.seoNote,
   ];
-  const fieldFlags = allFields.filter(f => f.status === 'review' || f.status === 'caveat' || f.status === 'associate_action').length;
-  const ps = pricingStatus(data.pricing);
-  return fieldFlags + (ps !== 'ready' ? 1 : 0);
+  const fieldFlags = allFields.filter(f => f.status === 'flag').length;
+  return fieldFlags + (pricingStatus(data.pricing) === 'flag' ? 1 : 0);
 }
 
 export function ReviewScreen() {
@@ -102,9 +96,12 @@ export function ReviewScreen() {
   const showSourceQuotes = true;
   const [reviewData, setReviewData] = useState<ReviewData>(EMPTY_REVIEW_DATA);
   const [supplierName, setSupplierName] = useState<string>('');
+  const [isPublished, setIsPublished] = useState(false);
   const [totalFlags, setTotalFlags] = useState(0);
   const [loadingRun, setLoadingRun] = useState(!!runId);
   const [resolvedSections, setResolvedSections] = useState<Record<string, number>>({});
+
+  const ALL_SECTION_IDS = ['s-title', 's-desc', 's-highlights', 's-inclusions', 's-exclusions', 's-faqs', 's-pricing', 's-seo', 's-cancel'];
 
   useEffect(() => {
     if (!runId) return;
@@ -117,13 +114,19 @@ export function ReviewScreen() {
     setLoadingRun(true);
     api.getRun(runId).then(run => {
       if (run.supplier_name) setSupplierName(run.supplier_name);
+      const published = run.status === 'published' || run.status === 'approved';
+      setIsPublished(published);
       const merged = run.artifacts?.merged_listing as Record<string, unknown> | undefined;
       if (merged) {
         const reviewArtifact = run.artifacts?.review as Record<string, unknown> | undefined;
         const data = mapRunToReviewData({ ...merged, review: reviewArtifact?.review });
         setReviewData(data);
-        const allFlags = buildFlagList(data);
-        setTotalFlags(allFlags.filter(f => f.type !== 'caveat').length);
+        setTotalFlags(buildFlagList(data).length);
+      }
+      if (published) {
+        const allResolved = Object.fromEntries(ALL_SECTION_IDS.map(id => [id, 99]));
+        setResolvedSections(allResolved);
+        if (runId) localStorage.setItem(`review-resolved-${runId}`, JSON.stringify(allResolved));
       }
     }).catch(() => {
       // Keep empty state on error
@@ -144,8 +147,7 @@ export function ReviewScreen() {
     });
   }, [reviewData, resolvedSections]);
 
-  const reviewFlagCount = useMemo(() => flagList.filter(f => f.type !== 'caveat').length, [flagList]);
-  const caveatFlagCount = useMemo(() => flagList.filter(f => f.type === 'caveat').length, [flagList]);
+  const flagCount = flagList.length;
 
   const [activeSection, setActiveSection] = useState('s-title');
   const [bannerExpanded, setBannerExpanded] = useState(false);
@@ -208,10 +210,9 @@ export function ReviewScreen() {
     return () => window.removeEventListener('raiseWithSupplier', handler);
   }, []);
 
-  const verdictReady = reviewFlagCount === 0 && !loadingRun;
-  const fullyReady = verdictReady && caveatFlagCount === 0;
+  const verdictReady = flagCount === 0 && !loadingRun;
   const experienceName = reviewData.title.options?.[0] ?? reviewData.title.value ?? 'Untitled listing';
-  const progressPct = totalFlags > 0 ? Math.round(((totalFlags - reviewFlagCount) / totalFlags) * 100) : 0;
+  const progressPct = totalFlags > 0 ? Math.round(((totalFlags - flagCount) / totalFlags) * 100) : 0;
 
   if (loadingRun) {
     return (
@@ -248,20 +249,30 @@ export function ReviewScreen() {
         }}>
           <Eye size={13} color="var(--purps)" /> Preview
         </button>
-        <button
-          onClick={() => verdictReady ? onPublish() : undefined}
-          disabled={!verdictReady}
-          title={!verdictReady ? 'Resolve all flags to unlock' : ''}
-          style={{
-            height: 32, padding: '0 16px',
-            background: verdictReady ? 'var(--purps)' : 'var(--ink30)',
-            color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600,
-            cursor: verdictReady ? 'pointer' : 'not-allowed',
-            display: 'flex', alignItems: 'center', gap: 6, transition: 'background 200ms',
-          }}
-        >
-          <Send size={13} color="#fff" /> Publish
-        </button>
+        {isPublished ? (
+          <span style={{
+            height: 32, padding: '0 14px', background: 'var(--green-bg)', color: '#166534',
+            border: '1.5px solid #86EFAC', borderRadius: 8, fontSize: 13, fontWeight: 600,
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            <CheckCircle size={13} color="var(--green)" /> Published
+          </span>
+        ) : (
+          <button
+            onClick={() => verdictReady ? onPublish() : undefined}
+            disabled={!verdictReady}
+            title={!verdictReady ? 'Resolve all flags to unlock' : ''}
+            style={{
+              height: 32, padding: '0 16px',
+              background: verdictReady ? 'var(--purps)' : 'var(--ink30)',
+              color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600,
+              cursor: verdictReady ? 'pointer' : 'not-allowed',
+              display: 'flex', alignItems: 'center', gap: 6, transition: 'background 200ms',
+            }}
+          >
+            <Send size={13} color="#fff" /> Publish
+          </button>
+        )}
       </div>
 
       {/* Verdict banner */}
@@ -279,33 +290,23 @@ export function ReviewScreen() {
               borderRadius: 999, transition: 'width 400ms ease-out',
             }} />
           </div>
-          {fullyReady ? (
+          {verdictReady ? (
             <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#166534', whiteSpace: 'nowrap' }}>
               <CheckCircle size={14} color="var(--green)" /> Ready to publish
             </span>
-          ) : verdictReady ? (
-            <button
-              onClick={() => setBannerExpanded(!bannerExpanded)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#166534', background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', padding: 0 }}
-            >
-              <CheckCircle size={14} color="var(--green)" />
-              Ready · {caveatFlagCount} {caveatFlagCount !== 1 ? 'caveats' : 'caveat'}
-              {bannerExpanded ? <X size={13} color="#166534" /> : <ArrowRight size={13} color="#166534" />}
-            </button>
           ) : (
             <button
               onClick={() => setBannerExpanded(!bannerExpanded)}
               style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#92400E', background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', padding: 0 }}
             >
               <AlertTriangle size={14} color="var(--amber)" />
-              {reviewFlagCount} {reviewFlagCount !== 1 ? 'issues' : 'issue'} to resolve
-              {caveatFlagCount > 0 && <span style={{ fontWeight: 400, color: '#92400E' }}>· {caveatFlagCount} caveats</span>}
+              {flagCount} {flagCount !== 1 ? 'flags' : 'flag'} to resolve
               {bannerExpanded ? <X size={13} color="#92400E" /> : <ArrowRight size={13} color="#92400E" />}
             </button>
           )}
         </div>
 
-        {(verdictReady ? caveatFlagCount > 0 : true) && bannerExpanded && (
+        {!verdictReady && bannerExpanded && (
           <div className="fade-in" style={{ padding: '0 20px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
             {flagList.map((fl, idx) => (
               <button
@@ -313,13 +314,13 @@ export function ReviewScreen() {
                 onClick={() => { scrollTo(fl.id); setBannerExpanded(false); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10, background: '#fff',
-                  border: `1px solid ${fl.type === 'review' ? '#FCA5A5' : fl.type === 'associate_action' ? '#FDBA74' : '#FDE68A'}`,
+                  border: '1px solid #FDE68A',
                   borderRadius: 8, padding: '8px 12px', cursor: 'pointer', textAlign: 'left', transition: 'background 120ms',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.background = fl.type === 'review' ? '#FFF5F5' : fl.type === 'associate_action' ? '#FFF7ED' : '#FFFBEB')}
+                onMouseEnter={e => (e.currentTarget.style.background = '#FFFBEB')}
                 onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
               >
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: fl.type === 'review' ? 'var(--red)' : fl.type === 'associate_action' ? 'var(--orange)' : 'var(--amber)', flexShrink: 0 }} />
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--amber)', flexShrink: 0 }} />
                 <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--slate)', minWidth: 120 }}>{fl.label}</span>
                 <span style={{ fontSize: 12, color: 'var(--ink60)', flex: 1 }}>{fl.reason}</span>
                 <ArrowRight size={13} color="var(--ink60)" style={{ flexShrink: 0 }} />
@@ -384,8 +385,8 @@ export function ReviewScreen() {
                 <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink60)', marginBottom: 2 }}>The following items need clarification from your side:</p>
                   {flagList.map((fl, i) => (
-                    <div key={`${fl.id}-${i}`} style={{ display: 'flex', gap: 10, padding: '10px 12px', background: fl.type === 'associate_action' ? '#FFF7ED' : '#FFFBEB', border: `1px solid ${fl.type === 'associate_action' ? '#FDBA74' : '#FDE68A'}`, borderRadius: 8 }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: fl.type === 'associate_action' ? 'var(--orange)' : 'var(--amber)', flexShrink: 0, marginTop: 1 }}>{i + 1}.</span>
+                    <div key={`${fl.id}-${i}`} style={{ display: 'flex', gap: 10, padding: '10px 12px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8 }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--amber)', flexShrink: 0, marginTop: 1 }}>{i + 1}.</span>
                       <div>
                         <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--slate)' }}>{fl.label}</p>
                         <p style={{ fontSize: 12, color: 'var(--ink60)', marginTop: 2, lineHeight: 1.5 }}>{fl.reason}</p>

@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Pencil, X, Check, RefreshCw, Quote, ChevronDown, ChevronUp, Send } from 'lucide-react';
+import { Pencil, X, Check, Quote, ChevronDown, ChevronUp, Send } from 'lucide-react';
 import { StatusPill } from './StatusPill';
 import type { FieldData, FieldStatus } from '../types';
 
@@ -15,31 +15,23 @@ export function FieldComponent({ field, showSource = true, onResolve }: FieldCom
   const [savedVal, setSavedVal] = useState(field.options ? field.options[0] : (field.value ?? ''));
   const [activeTab, setActiveTab] = useState(0);
   const [edited, setEdited] = useState(false);
-  const [expanded, setExpanded] = useState(field.status === 'review' || field.status === 'associate_action');
+  const [expanded, setExpanded] = useState(field.status === 'flag');
   const [resolved, setResolved] = useState(false);
   const [sourceOpen, setSourceOpen] = useState(false);
-  const [regenerating, setRegen] = useState(false);
-  const [confirmRegen, setConfirmRegen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const status: FieldStatus = resolved ? 'ready' : field.status;
 
   const borderColor = editing ? 'var(--purps)'
-    : status === 'review' ? '#FCA5A5'
-    : status === 'associate_action' ? '#FDBA74'
-    : status === 'caveat' ? '#FCD34D'
+    : status === 'flag' ? '#FDE68A'
     : 'var(--border)';
 
   const headerBorderColor = editing ? 'var(--dreamy)'
-    : status === 'review' ? '#FCA5A5'
-    : status === 'associate_action' ? '#FED7AA'
-    : status === 'caveat' ? '#FDE68A'
+    : status === 'flag' ? '#FDE68A'
     : 'var(--border)';
 
   const headerBg = editing ? '#FAFBFF'
-    : status === 'review' ? '#FFF5F5'
-    : status === 'associate_action' ? '#FFF7ED'
-    : status === 'caveat' ? '#FFFBEB'
+    : status === 'flag' ? '#FFFBEB'
     : '#FAFAFA';
 
   const handleTabChange = (i: number) => {
@@ -64,18 +56,6 @@ export function FieldComponent({ field, showSource = true, onResolve }: FieldCom
 
   const handleCancel = () => { setVal(savedVal); setEditing(false); };
 
-  const handleRegen = () => {
-    setConfirmRegen(false);
-    setRegen(true);
-    setTimeout(() => {
-      const orig = field.options ? field.options[0] : (field.value ?? '');
-      setRegen(false);
-      setVal(orig);
-      setSavedVal(orig);
-      setEdited(false);
-    }, 1400);
-  };
-
   const handleRaiseWithSupplier = () => {
     window.dispatchEvent(new CustomEvent('raiseWithSupplier'));
   };
@@ -98,7 +78,7 @@ export function FieldComponent({ field, showSource = true, onResolve }: FieldCom
           }}>
             {field.label}
           </span>
-          <StatusPill status={status} tooltip={field.reason ?? field.caveat} />
+          <StatusPill status={status} tooltip={field.reason} />
         </span>
 
         {/* Source quote */}
@@ -134,71 +114,32 @@ export function FieldComponent({ field, showSource = true, onResolve }: FieldCom
           </div>
         )}
 
-        {/* Actions */}
-        {!regenerating && (
-          editing ? (
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button onClick={handleCancel} style={{
-                display: 'flex', alignItems: 'center', gap: 4, height: 26, padding: '0 10px',
-                borderRadius: 6, border: '1px solid var(--border)', background: '#fff',
-                fontSize: 12, fontWeight: 500, cursor: 'pointer', color: 'var(--ink60)',
-              }}>
-                <X size={12} /> Cancel
-              </button>
-              <button onClick={handleSave} style={{
-                display: 'flex', alignItems: 'center', gap: 4, height: 26, padding: '0 10px',
-                borderRadius: 6, border: '1px solid #86EFAC', background: 'var(--green-bg)',
-                fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#166534',
-              }}>
-                <Check size={12} /> Save
-              </button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', gap: 4 }}>
-              <button onClick={() => setEditing(true)} style={{
-                display: 'flex', alignItems: 'center', gap: 4, height: 26, padding: '0 10px',
-                borderRadius: 6, border: '1px solid var(--border)', background: '#fff',
-                fontSize: 12, fontWeight: 500, cursor: 'pointer', color: 'var(--ink60)',
-              }}>
-                <Pencil size={12} /> Edit
-              </button>
-              <div style={{ position: 'relative' }}>
-                <button onClick={() => setConfirmRegen(!confirmRegen)} style={{
-                  display: 'flex', alignItems: 'center', gap: 4, height: 26, padding: '0 10px',
-                  borderRadius: 6, border: '1px solid var(--purps)', background: 'var(--purps)',
-                  fontSize: 12, fontWeight: 500, cursor: 'pointer', color: '#fff',
-                }}>
-                  <RefreshCw size={12} color="#fff" /> Regenerate
-                </button>
-                {confirmRegen && (
-                  <div className="fade-in" style={{
-                    position: 'absolute', right: 0, top: 'calc(100% + 4px)', background: '#fff',
-                    border: '1px solid var(--border)', borderRadius: 8, padding: 12,
-                    zIndex: 50, minWidth: 220, boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
-                  }}>
-                    <p style={{ fontSize: 12, color: 'var(--ink60)', marginBottom: 10, lineHeight: 1.5 }}>
-                      Regenerate this field? Your edits will be lost.
-                    </p>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button onClick={handleRegen} style={{
-                        flex: 1, height: 28, background: 'var(--purps)', color: '#fff',
-                        border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600,
-                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-                      }}>
-                        <RefreshCw size={11} color="#fff" /> Regenerate
-                      </button>
-                      <button onClick={() => setConfirmRegen(false)} style={{
-                        flex: 1, height: 28, background: 'var(--ink10)', border: 'none',
-                        borderRadius: 6, fontSize: 12, cursor: 'pointer',
-                      }}>
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )
+        {/* Edit action */}
+        {editing ? (
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={handleCancel} style={{
+              display: 'flex', alignItems: 'center', gap: 4, height: 26, padding: '0 10px',
+              borderRadius: 6, border: '1px solid var(--border)', background: '#fff',
+              fontSize: 12, fontWeight: 500, cursor: 'pointer', color: 'var(--ink60)',
+            }}>
+              <X size={12} /> Cancel
+            </button>
+            <button onClick={handleSave} style={{
+              display: 'flex', alignItems: 'center', gap: 4, height: 26, padding: '0 10px',
+              borderRadius: 6, border: '1px solid #86EFAC', background: 'var(--green-bg)',
+              fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#166534',
+            }}>
+              <Check size={12} /> Save
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => setEditing(true)} style={{
+            display: 'flex', alignItems: 'center', gap: 4, height: 26, padding: '0 10px',
+            borderRadius: 6, border: '1px solid var(--border)', background: '#fff',
+            fontSize: 12, fontWeight: 500, cursor: 'pointer', color: 'var(--ink60)',
+          }}>
+            <Pencil size={12} /> Edit
+          </button>
         )}
       </div>
 
@@ -235,12 +176,7 @@ export function FieldComponent({ field, showSource = true, onResolve }: FieldCom
 
       {/* Content */}
       <div style={{ padding: '12px 14px', position: 'relative' }}>
-        {regenerating ? (
-          <div style={{ height: 60, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ width: 14, height: 14, border: '2px solid var(--border)', borderTopColor: 'var(--purps)', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-            <span style={{ fontSize: 13, color: 'var(--ink60)' }}>Regenerating…</span>
-          </div>
-        ) : editing ? (
+        {editing ? (
           <textarea
             ref={textareaRef}
             value={val}
@@ -265,24 +201,20 @@ export function FieldComponent({ field, showSource = true, onResolve }: FieldCom
       </div>
 
       {/* Flag detail */}
-      {status !== 'ready' && (
+      {status === 'flag' && (
         <div style={{ borderTop: '1px solid var(--border)' }}>
           <button onClick={() => setExpanded(!expanded)} style={{
             width: '100%', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 6,
             background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink60)', fontSize: 12,
           }}>
             {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-            {status === 'associate_action' ? 'Why this needs your input' : 'Why this needs review'}
+            Why this is flagged
           </button>
           {expanded && (
             <div className="fade-in" style={{ padding: '0 14px 14px' }}>
-              {field.reason && <p style={{ fontSize: 13, color: 'var(--slate)', marginBottom: 8 }}>{field.reason}</p>}
-              {field.caveat && (
-                <p style={{ fontSize: 13, color: '#92400E', marginBottom: 8, background: '#FFFBEB', padding: '6px 10px', borderRadius: 6 }}>
-                  ℹ {field.caveat}
-                </p>
-              )}
-              {!field.reason && !field.caveat && (
+              {field.reason ? (
+                <p style={{ fontSize: 13, color: 'var(--slate)', marginBottom: 8 }}>{field.reason}</p>
+              ) : (
                 <p style={{ fontSize: 13, color: 'var(--ink60)', marginBottom: 8, fontStyle: 'italic' }}>No additional context from the review agent.</p>
               )}
               {field.source && <p style={{ fontSize: 12, color: 'var(--ink60)', fontStyle: 'italic', marginBottom: 10 }}>"{field.source}"</p>}

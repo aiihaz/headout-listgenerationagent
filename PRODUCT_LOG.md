@@ -1,7 +1,7 @@
 # Headout AI Listing Generation Pipeline — Product Log
 
 > **Working directory**: `/Users/ihaz/Projects/list generation agent/`
-> **Last updated**: 2026-05-04 (Session 20)
+> **Last updated**: 2026-05-05 (Session 21)
 > **Status**: CLI pipeline complete and **verified end-to-end with OpenAI**. Frontend complete (all 6 screens, wired to real API, **deployed to Vercel**). Backend complete (Phases 1–2), **deployed to Render**. Full production stack live. URL routing overhauled (react-router-dom, `/listings/:id/` scheme, Vercel SPA rewrite). TopNav logout dropdown added. **Frontend: https://headout-listing-agent.vercel.app | Backend: https://headout-listgenerationagent.onrender.com**
 > **Repo**: https://github.com/aiihaz/headout-listgenerationagent (default branch: `staging`)
 
@@ -122,12 +122,12 @@ Design source: `experience-onboarding-agent/` bundle (Headout design system — 
 | `frontend/public/logo.svg` | Headout logo | Done |
 | `frontend/public/fonts/` | Halyard Display + Halyard Text (.otf) | Done |
 | `frontend/src/index.css` | Headout design tokens: CSS custom properties, font faces, animations | Done |
-| `frontend/src/types.ts` | TypeScript types: Screen, FieldData, ListingRow, ProcessData, RunStatus (includes `serper_in_progress`, `serper_complete`, `serper_skipped`), etc.; `ReviewBlocker.action_required: 'regenerate' \| 'associate_action'`; `FieldData.action` added; `escalated_to_human` moved from `TERMINAL_FAIL` to `TERMINAL_OK` | Done — updated 2026-05-04 |
+| `frontend/src/types.ts` | TypeScript types: FieldData, ListingRow, RunStatus (includes serper states), etc.; `FieldStatus: 'ready' \| 'flag'`; `VerdictType: 'ready' \| 'flag' \| null`; `escalated_to_human` in `TERMINAL_OK` | Done — updated 2026-05-05 |
 | `frontend/src/main.tsx` | React root | Done |
 | `frontend/src/App.tsx` | Screen router (dashboard → upload → processing → review → publish → published) | Done |
 | `frontend/src/components/TopNav.tsx` | Nav bar: logo, "Listing Agent" label, autosave indicator, user avatar | Done |
-| `frontend/src/components/StatusPill.tsx` | Ready / Caveat added / Needs review pill with hover tooltip | Done |
-| `frontend/src/components/FieldComponent.tsx` | Core field: A/B/C tab switcher, inline edit, source quote popover, regenerate confirm, flag detail expander; always shows both "Update manually" and "Raise with supplier" — associate chooses whichever fits their context | Done — updated 2026-05-04 |
+| `frontend/src/components/StatusPill.tsx` | Ready / Flagged / Processing pill with hover tooltip; single amber `flag` status replaces previous caveat/review/associate_action split | Done — updated 2026-05-05 |
+| `frontend/src/components/FieldComponent.tsx` | Core field: A/B/C tab switcher, inline edit, source quote popover, flag detail expander; two resolution actions only (Update manually / Raise with supplier); no regenerate button | Done — updated 2026-05-05 |
 | `frontend/src/pages/Dashboard.tsx` | Screen 1: listings table, status pills with flag counts, search, status filters | Done |
 | `frontend/src/pages/UploadScreen.tsx` | Screen 2: paste tab + file drag-and-drop + supplier autocomplete dropdown | Done |
 | `frontend/src/pages/ProcessingScreen.tsx` | Screen 3: animated stage stepper (6 stages), live progress bar, context line; stage 2 updated to "Researching search landscape" covering serper states | Done — updated 2026-05-03 |
@@ -512,6 +512,52 @@ All 6 screens built, verified in browser, production build passing. See "Fronten
 ---
 
 ## Session History
+
+### Session 21 — Flag system unification + publish persistence (2026-05-05)
+
+Two changes: collapsed the multi-tier flag concept into a single `'flag'` status throughout the entire frontend, and fixed published listings still showing stale flags on the dashboard.
+
+**Publish persistence fix**
+
+After publishing a listing and returning to the dashboard, the row still showed "ready N caveats" because `PublishConfirm` was navigating locally without making any API call — the database status never changed from `ready_for_publish` and `flag_count` was never cleared.
+
+Changes:
+- `backend/routers/runs.py` — new `POST /runs/{run_id}/publish` endpoint; validates run exists, calls `publish_run()`, returns `{run_id, status: "published"}`
+- `backend/services/supabase_service.py` — new `publish_run()` function; sets `status='published'` and `flag_count=0` in Supabase (or writes a marker file in filesystem mode)
+- `frontend/src/lib/api.ts` — new `publishRun(runId)` method calling the endpoint
+- `frontend/src/pages/PublishConfirm.tsx` — `onConfirm` is now async; calls `api.publishRun(runId)` before navigating; shows "Publishing…" state on the button during the call
+- `frontend/src/pages/ReviewScreen.tsx` — detects `run.status === 'published'` on load; auto-populates `resolvedSections` with value 99 for all section IDs and persists to localStorage, so re-opening a published listing never shows stale flags
+- `frontend/src/pages/Dashboard.tsx` — `verdictFromStatus()` returns `null` for `'published'` status regardless of historical flag count
+
+**Flag concept unification**
+
+The review layer had a three-tier flag system: `'review'` (hard blocker, red), `'caveat'` (soft warning, orange), and `'associate_action'` (intake gap, orange). In practice every flag has the same two resolution paths — "Update manually" or "Raise with supplier" — and the distinction was confusing rather than useful. All flag types are now collapsed to a single `'flag'` status with amber styling throughout.
+
+Changes:
+- `frontend/src/types.ts` — `FieldStatus`: `'ready' | 'caveat' | 'review' | 'associate_action'` → `'ready' | 'flag'`; `VerdictType`: `'ready' | 'caveat' | 'review' | null` → `'ready' | 'flag' | null`; removed `caveat?: string` from `FieldData`
+- `frontend/src/components/StatusPill.tsx` — rewritten; removed `caveat`, `review`, `associate_action` entries; single `flag` entry with amber colors
+- `frontend/src/components/FieldComponent.tsx` — rewritten; removed Regenerate button and all associated state (`confirmRegen`, `regenerating`, `handleRegen`); removed `RefreshCw` import; single amber border for `flag`; "Why this is flagged" header; exactly two action buttons (Update manually / Raise with supplier)
+- `frontend/src/lib/mapRunToReviewData.ts` — `fieldStatus()` returns `'flag'` for any blocker OR warning; `fixReason()` checks both; `fixCaveat()` removed; all `caveat:` properties removed
+- `frontend/src/components/PricingTable.tsx` — `derivePricingStatus()` returns `'flag'` for all error conditions (previously split between `'review'` for missing adult tier and `'caveat'` for missing prices); border/bg unified to amber; empty variants state uses `status="flag"`
+- `frontend/src/pages/ReviewScreen.tsx` — `buildFlagList()`, `countFlags()`, banner, and supplier modal all simplified to single flag concept; `flagCount`/`verdictReady` replaces previous `reviewFlagCount`/`caveatFlagCount`/`fullyReady`
+- `frontend/src/pages/Dashboard.tsx` — `verdictFromStatus()` returns `'flag'` (not `'caveat'`/`'review'`); `rowPillStyle()` unified
+
+**TypeScript verification:** `npx tsc --noEmit` passes clean after all changes.
+
+**Files modified:**
+- `backend/routers/runs.py`
+- `backend/services/supabase_service.py`
+- `frontend/src/lib/api.ts`
+- `frontend/src/lib/mapRunToReviewData.ts`
+- `frontend/src/types.ts`
+- `frontend/src/components/FieldComponent.tsx`
+- `frontend/src/components/PricingTable.tsx`
+- `frontend/src/components/StatusPill.tsx`
+- `frontend/src/pages/Dashboard.tsx`
+- `frontend/src/pages/PublishConfirm.tsx`
+- `frontend/src/pages/ReviewScreen.tsx`
+
+---
 
 ### Session 20 — Review Screen: SEO caveat suppression + cancellation policy robustness (2026-05-04)
 

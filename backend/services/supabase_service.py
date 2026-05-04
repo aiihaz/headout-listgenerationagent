@@ -69,6 +69,29 @@ async def update_run_status(
     )
 
 
+async def publish_run(run_id: str) -> bool:
+    client = _get_client()
+    if client is None:
+        # filesystem mode: write a marker file
+        import os, json
+        path = os.path.join("listings", run_id, "published.json")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as f:
+            json.dump({"status": "published"}, f)
+        return True
+    try:
+        resp = (
+            client.table("runs")
+            .update({"status": "published", "flag_count": 0})
+            .eq("id", run_id)
+            .execute()
+        )
+        return bool(resp.data)
+    except Exception as exc:
+        logger.error("publish_run failed for %s: %s", run_id, exc)
+        return False
+
+
 async def write_artifact(run_id: str, artifact_type: str, payload: dict) -> None:
     data = {"run_id": run_id, "type": artifact_type, "payload": payload}
     await supabase_write_with_retry("run_artifacts", data, operation="upsert")

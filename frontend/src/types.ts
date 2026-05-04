@@ -1,6 +1,6 @@
-export type FieldStatus = 'ready' | 'caveat' | 'review' | 'associate_action';
+export type FieldStatus = 'ready' | 'flag';
 export type ListingStatus = 'Draft' | 'Processing' | 'In Review' | 'Ready' | 'Published' | 'Failed';
-export type VerdictType = 'ready' | 'caveat' | 'review' | null;
+export type VerdictType = 'ready' | 'flag' | null;
 
 export type RunStatus =
   | 'pending'
@@ -109,9 +109,8 @@ export interface FieldData {
   value?: string;
   options?: string[];    // A/B/C variants
   status: FieldStatus;
-  reason?: string;       // why this needs review
-  caveat?: string;       // caveat message
-  source: string | null; // null = agent inferred
+  reason?: string;
+  source: string | null;
   action?: 'regenerate' | 'associate_action';
 }
 

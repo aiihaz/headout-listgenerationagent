@@ -12,9 +12,10 @@ const STATUSES = ['All', 'Draft', 'Processing', 'In Review', 'Ready', 'Published
 type StatusFilter = typeof STATUSES[number];
 
 function verdictFromStatus(status: ApiRun['status'], flagCount?: number | null): ListingRow['verdict'] {
-  if (status === 'ready_for_publish' || status === 'published' || status === 'approved') return flagCount ? 'caveat' : 'ready';
-  if (status === 'escalated_to_human' || status === 'regeneration_in_progress') return 'caveat';
-  if (status === 'intake_failed' || status === 'generation_blocked') return 'review';
+  if (status === 'published' || status === 'approved') return null;
+  if (status === 'ready_for_publish') return flagCount ? 'flag' : 'ready';
+  if (status === 'escalated_to_human' || status === 'regeneration_in_progress') return 'flag';
+  if (status === 'intake_failed' || status === 'generation_blocked') return 'flag';
   return null;
 }
 
@@ -50,9 +51,8 @@ function rowFromApiRun(run: ApiRun): ListingRow {
 function rowPillStyle(l: ListingRow): { background: string; color: string } {
   if (l.status === 'Published') return { background: 'var(--green-bg)', color: '#166534' };
   if (l.status === 'Processing') return { background: 'var(--dreamy)', color: 'var(--purps)' };
-  if (l.status === 'In Review' && l.verdict === 'review') return { background: 'var(--red-bg)', color: 'var(--red)' };
-  if (l.status === 'In Review' && l.verdict === 'caveat') return { background: 'var(--amber-bg)', color: '#92400E' };
-  if (l.status === 'Ready') return { background: 'var(--green-bg)', color: '#166534' };
+  if (l.verdict === 'flag') return { background: 'var(--amber-bg)', color: '#92400E' };
+  if (l.status === 'Ready' || l.verdict === 'ready') return { background: 'var(--green-bg)', color: '#166534' };
   if (l.status === 'Failed') return { background: 'var(--red-bg)', color: 'var(--red)' };
   return { background: 'var(--ink10)', color: 'var(--ink60)' };
 }
@@ -223,11 +223,8 @@ export function Dashboard() {
                           <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--purps)', flexShrink: 0, animation: 'pulse 1.2s ease-in-out infinite' }} />
                         )}
                         {l.status}
-                        {l.verdict === 'review' && l.flags != null && l.flags > 0 && (
+                        {l.verdict === 'flag' && l.flags != null && l.flags > 0 && (
                           <span style={{ fontWeight: 700 }}>· {l.flags} flag{l.flags !== 1 ? 's' : ''}</span>
-                        )}
-                        {l.verdict === 'caveat' && l.flags != null && l.flags > 0 && (
-                          <span style={{ fontWeight: 700 }}>· {l.flags} caveat{l.flags !== 1 ? 's' : ''}</span>
                         )}
                       </span>
                     </td>

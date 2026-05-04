@@ -24,12 +24,12 @@ function formatPrice(tier: PricingTier): string {
 }
 
 function derivePricingStatus(variants: PricingVariant[]): FieldStatus {
-  if (variants.length === 0) return 'review';
+  if (variants.length === 0) return 'flag';
   for (const v of variants) {
-    if (v.tiers.length === 0) return 'review';
+    if (v.tiers.length === 0) return 'flag';
     const hasAdult = v.tiers.some(t => t.ageGroup === 'ADULT' || t.ageGroup === 'GROUP');
-    if (!hasAdult) return 'review';
-    if (v.tiers.some(t => !t.isFree && t.pricePerUnit == null)) return 'caveat';
+    if (!hasAdult) return 'flag';
+    if (v.tiers.some(t => !t.isFree && t.pricePerUnit == null)) return 'flag';
   }
   return 'ready';
 }
@@ -144,13 +144,9 @@ export function PricingTable({ variants, onResolve }: PricingTableProps) {
   const status: FieldStatus = resolved ? 'ready' : derivePricingStatus(variants);
   const activeUnit = unitOverride ?? (variants[0]?.unit ?? 'person');
 
-  const borderColor = editing ? 'var(--purps)'
-    : status === 'review' ? '#FCA5A5'
-    : status === 'caveat' ? '#FCD34D'
-    : 'var(--border)';
-
-  const headerBg = status === 'review' ? '#FFF5F5' : status === 'caveat' ? '#FFFBEB' : '#FAFAFA';
-  const headerBorder = status === 'review' ? '#FCA5A5' : status === 'caveat' ? '#FDE68A' : 'var(--border)';
+  const borderColor = editing ? 'var(--purps)' : status === 'flag' ? '#FDE68A' : 'var(--border)';
+  const headerBg = status === 'flag' ? '#FFFBEB' : '#FAFAFA';
+  const headerBorder = status === 'flag' ? '#FDE68A' : 'var(--border)';
 
   const handleSave = () => {
     setEditing(false);
@@ -162,10 +158,10 @@ export function PricingTable({ variants, onResolve }: PricingTableProps) {
 
   if (variants.length === 0) {
     return (
-      <div style={{ border: '1.5px solid #FCA5A5', borderRadius: 10, background: '#fff', marginBottom: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', gap: 8, borderBottom: '1px solid #FCA5A5', background: '#FFF5F5' }}>
+      <div style={{ border: '1.5px solid #FDE68A', borderRadius: 10, background: '#fff', marginBottom: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', gap: 8, borderBottom: '1px solid #FDE68A', background: '#FFFBEB' }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--slate)', fontFamily: 'var(--font-display)' }}>Pricing</span>
-          <StatusPill status="review" />
+          <StatusPill status="flag" />
         </div>
         <div style={{ padding: '14px', color: 'var(--ink60)', fontSize: 13 }}>
           No pricing data extracted — supplier input did not include pricing. Add manually or raise with supplier.
@@ -263,12 +259,10 @@ export function PricingTable({ variants, onResolve }: PricingTableProps) {
       </div>
 
       {/* Missing pricing notice */}
-      {status !== 'ready' && (
+      {status === 'flag' && (
         <div style={{ borderTop: '1px solid var(--border)', padding: '10px 14px' }}>
-          <p style={{ fontSize: 12, color: status === 'review' ? 'var(--red)' : '#92400E', fontStyle: 'italic' }}>
-            {status === 'review'
-              ? 'No adult pricing found — confirm with supplier before publishing.'
-              : 'Some price tiers are missing — verify with supplier.'}
+          <p style={{ fontSize: 12, color: '#92400E', fontStyle: 'italic' }}>
+            Pricing is incomplete — confirm with supplier before publishing.
           </p>
         </div>
       )}
