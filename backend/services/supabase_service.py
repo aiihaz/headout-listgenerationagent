@@ -82,7 +82,7 @@ async def get_run_status(run_id: str) -> Optional[dict[str, Any]]:
     try:
         resp = (
             client.table("runs")
-            .select("id,status,error_message,supplier_name")
+            .select("id,status,error_message")
             .eq("id", run_id)
             .single()
             .execute()
