@@ -1,7 +1,7 @@
 # Headout AI Listing Generation Pipeline — Product Log
 
 > **Working directory**: `/Users/ihaz/Projects/list generation agent/`
-> **Last updated**: 2026-05-05 (Session 23)
+> **Last updated**: 2026-05-05 (Session 24)
 > **Status**: CLI pipeline complete and **verified end-to-end with OpenAI**. Frontend complete (all 6 screens, wired to real API, **deployed to Vercel**). Backend complete (Phases 1–2), **deployed to Render**. Full production stack live. URL routing overhauled (react-router-dom, `/listings/:id/` scheme, Vercel SPA rewrite). TopNav logout dropdown added. **Frontend: https://headout-listing-agent.vercel.app | Backend: https://headout-listgenerationagent.onrender.com**
 > **Repo**: https://github.com/aiihaz/headout-listgenerationagent (default branch: `staging`)
 
@@ -122,13 +122,13 @@ Design source: `experience-onboarding-agent/` bundle (Headout design system — 
 | `frontend/public/logo.svg` | Headout logo | Done |
 | `frontend/public/fonts/` | Halyard Display + Halyard Text (.otf) | Done |
 | `frontend/src/index.css` | Headout design tokens: CSS custom properties, font faces, animations | Done |
-| `frontend/src/types.ts` | TypeScript types: FieldData, ListingRow, RunStatus (includes serper states), etc.; `FieldStatus: 'ready' \| 'flag'`; `VerdictType: 'ready' \| 'flag' \| null`; `escalated_to_human` in `TERMINAL_OK` | Done — updated 2026-05-05 |
+| `frontend/src/types.ts` | TypeScript types: FieldData, ListingRow, RunStatus (includes serper states), etc.; `FieldStatus: 'ready' \| 'flag'`; `VerdictType: 'ready' \| 'flag' \| null`; `escalated_to_human` in `TERMINAL_OK`; `created_by_email` added to `ApiRun` | Done — updated 2026-05-05 |
 | `frontend/src/main.tsx` | React root | Done |
 | `frontend/src/App.tsx` | Screen router (dashboard → upload → processing → review → publish → published) | Done |
 | `frontend/src/components/TopNav.tsx` | Nav bar: logo, "Listing Agent" label, autosave indicator, user avatar | Done |
 | `frontend/src/components/StatusPill.tsx` | Ready / Flagged / Processing pill with hover tooltip; single amber `flag` status replaces previous caveat/review/associate_action split | Done — updated 2026-05-05 |
 | `frontend/src/components/FieldComponent.tsx` | Core field: A/B/C tab switcher, inline edit, source quote popover, flag detail expander; two resolution actions only (Update manually / Raise with supplier); no regenerate button | Done — updated 2026-05-05 |
-| `frontend/src/pages/Dashboard.tsx` | Screen 1: listings table, status pills with flag counts, search, status filters | Done |
+| `frontend/src/pages/Dashboard.tsx` | Screen 1: listings table, status pills with flag counts, search, status filters; Assigned column now shows creator's initials derived from `created_by_email`, not the viewer's | Done — updated 2026-05-05 |
 | `frontend/src/pages/UploadScreen.tsx` | Screen 2: paste tab + file drag-and-drop + supplier autocomplete dropdown | Done |
 | `frontend/src/pages/ProcessingScreen.tsx` | Screen 3: animated stage stepper (6 stages), live progress bar, context line; stage 2 updated to "Researching search landscape" covering serper states | Done — updated 2026-05-03 |
 | `frontend/src/pages/ReviewScreen.tsx` | Screen 4: horizontal section nav with status dots, verdict banner, supplier clarification modal, operating hours module | Done |
@@ -155,7 +155,9 @@ Located at `backend/`. Run with `uvicorn backend.main:app --reload`. Requires no
 | `backend/tests/test_status_endpoint_regression.py` | 2 regression tests for ISSUE-001: verifies `supplier_name` absent from select, graceful None on missing run | Done — 2026-05-04 |
 
 **Changes to existing files:**
-- `backend/routers/runs.py` — `POST /api/v1/runs` now fires `launch_pipeline` as a `BackgroundTask`; added `POST /runs/:id/regenerate` (targeted section regen) and `POST /runs/:id/images` (file upload)
+- `backend/routers/runs.py` — `POST /api/v1/runs` now fires `launch_pipeline` as a `BackgroundTask`; added `POST /runs/:id/regenerate` (targeted section regen) and `POST /runs/:id/images` (file upload); `create_run` now saves `created_by_email` alongside `created_by` UUID — 2026-05-05
+- `backend/services/supabase_service.py` — `list_runs` select includes `created_by_email` — 2026-05-05
+- `DB migration` — `created_by_email text` column added to `public.runs`; backfilled from `auth.users` — 2026-05-05
 - `orchestrator.py` — accepts optional `run_id` and `status_callback` params; Content Generator + Template Engine now run in parallel via `ThreadPoolExecutor`; `_notify()` helper calls callback at every state transition
 
 **Sync/async bridge pattern:**
