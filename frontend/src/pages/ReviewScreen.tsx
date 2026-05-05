@@ -297,7 +297,7 @@ export function ReviewScreen() {
           {experienceName}
         </span>
         <span style={{ flex: 1 }} />
-        <button style={{
+        <button onClick={() => window.open('https://www.headout.com', '_blank')} style={{
           height: 32, padding: '0 14px', background: 'transparent', color: 'var(--purps)',
           border: '1.5px solid var(--purps)', borderRadius: 8, fontSize: 13, fontWeight: 500,
           cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,

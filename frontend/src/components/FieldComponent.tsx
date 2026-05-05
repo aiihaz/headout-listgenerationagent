@@ -165,6 +165,13 @@ export function FieldComponent({ field, showSource = true, onResolve, onRegenera
           </div>
         ) : (
           <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={() => { setEditStartVal(val); setEditStartTab(activeTab); setEditing(true); }} style={{
+              display: 'flex', alignItems: 'center', gap: 4, height: 26, padding: '0 10px',
+              borderRadius: 6, border: '1px solid var(--border)', background: '#fff',
+              fontSize: 12, fontWeight: 500, cursor: 'pointer', color: 'var(--ink60)',
+            }}>
+              <Pencil size={12} /> Edit
+            </button>
             {onRegenerate && (
               <button onClick={handleRegenerate} disabled={regenerating} style={{
                 display: 'flex', alignItems: 'center', gap: 4, height: 26, padding: '0 10px',
@@ -175,13 +182,6 @@ export function FieldComponent({ field, showSource = true, onResolve, onRegenera
                 {regenerating ? 'Regenerating…' : 'Regenerate'}
               </button>
             )}
-            <button onClick={() => { setEditStartVal(val); setEditStartTab(activeTab); setEditing(true); }} style={{
-              display: 'flex', alignItems: 'center', gap: 4, height: 26, padding: '0 10px',
-              borderRadius: 6, border: '1px solid var(--border)', background: '#fff',
-              fontSize: 12, fontWeight: 500, cursor: 'pointer', color: 'var(--ink60)',
-            }}>
-              <Pencil size={12} /> Edit
-            </button>
           </div>
         )}
       </div>
