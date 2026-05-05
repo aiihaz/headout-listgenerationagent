@@ -1,5 +1,5 @@
 import { getSessionToken } from './supabase';
-import type { ApiRun, RunDetail, RunStatus } from '../types';
+import type { ApiRun, RunDetail, RunStatus, Supplier } from '../types';
 
 export interface RunStatusResponse {
   id: string;
@@ -30,11 +30,25 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
-  createRun(supplierInput: string, experienceName?: string): Promise<{ run_id: string; status: string }> {
+  createRun(
+    supplierInput: string,
+    experienceName?: string,
+    supplier?: { id: string; name: string; city: string },
+  ): Promise<{ run_id: string; status: string }> {
     return request('/api/v1/runs', {
       method: 'POST',
-      body: JSON.stringify({ supplier_input: supplierInput, experience_name: experienceName || undefined }),
+      body: JSON.stringify({
+        supplier_input: supplierInput,
+        experience_name: experienceName || undefined,
+        supplier_id: supplier?.id,
+        supplier_name: supplier?.name,
+        supplier_city: supplier?.city,
+      }),
     });
+  },
+
+  getSuppliers(): Promise<Supplier[]> {
+    return request('/api/v1/suppliers');
   },
 
   getRunStatus(runId: string): Promise<RunStatusResponse> {

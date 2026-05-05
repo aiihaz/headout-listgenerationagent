@@ -41,11 +41,19 @@ export function runStatusToListingStatus(s: RunStatus): ListingStatus {
   return 'Draft';
 }
 
+export interface Supplier {
+  id: string;
+  name: string;
+  city: string;
+}
+
 export interface ApiRun {
   id: string;
   status: RunStatus;
   supplier_input: string;
-  supplier_name?: string;
+  supplier_name?: string | null;
+  supplier_city?: string | null;
+  supplier_id?: string | null;
   experience_name?: string | null;
   created_at?: string;
   updated_at?: string;

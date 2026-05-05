@@ -45,7 +45,7 @@ function rowFromApiRun(run: ApiRun): ListingRow {
     runId: run.id,
     supplier: run.supplier_name ?? '—',
     experience: experienceName,
-    city: '—',
+    city: run.supplier_city ?? '—',
     status: listingStatus,
     verdict: verdictFromStatus(run.status, run.flag_count),
     flags: run.flag_count ?? null,

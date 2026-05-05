@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { ChevronRight, Search, X, UploadCloud, ChevronDown, ChevronUp, Check, Zap } from 'lucide-react';
 import { api } from '../lib/api';
+import type { Supplier } from '../types';
 import { useNavigate } from 'react-router-dom';
 
 interface UploadedFile {
@@ -10,19 +11,6 @@ interface UploadedFile {
   error?: boolean;
   rawFile?: File;
 }
-
-const SUPPLIERS = [
-  { id: 'SUP-00412', name: 'Athens Heritage Group', city: 'Athens' },
-  { id: 'SUP-00218', name: 'Desert Adventures UAE', city: 'Dubai' },
-  { id: 'SUP-00531', name: 'Paris Monuments SAS', city: 'Paris' },
-  { id: 'SUP-00076', name: 'Colosseum Tours SpA', city: 'Rome' },
-  { id: 'SUP-00394', name: 'Barcelona Sights S.L.', city: 'Barcelona' },
-  { id: 'SUP-00167', name: 'Kyoto Experiences Ltd.', city: 'Kyoto' },
-  { id: 'SUP-00823', name: 'NYC Summit LLC', city: 'New York' },
-  { id: 'SUP-00290', name: 'London Eye Ventures', city: 'London' },
-  { id: 'SUP-00445', name: 'Sagrada Familia Tours', city: 'Barcelona' },
-  { id: 'SUP-00611', name: 'Cairo Pharaoh Expeditions', city: 'Cairo' },
-];
 
 const SAMPLE_INPUT = `supplier 1: Desert Adventures LLC — Dubai
 Contract: Commission 22%, capacity 40 pax per trip, 2 departures daily (4:00 PM, 4:30 PM), blackout dates Dec 25 + Jan 1, cancellation 24hr full refund / 48hr 50% refund. Operating since 2019. Pick-up from 15 hotels in Dubai Marina and JBR. Trip duration approximately 6 hours.
@@ -51,10 +39,15 @@ export function UploadScreen() {
   const [expName, setExpName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [sampleUsed, setSampleUsed] = useState(false);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const supplierRef = useRef<HTMLDivElement>(null);
 
-  const selectedSupplier = SUPPLIERS.find(s => s.id === supplierID);
-  const filteredSuppliers = SUPPLIERS.filter(s =>
+  useEffect(() => {
+    api.getSuppliers().then(setSuppliers).catch(() => {});
+  }, []);
+
+  const selectedSupplier = suppliers.find(s => s.id === supplierID);
+  const filteredSuppliers = suppliers.filter(s =>
     supplierQuery.length === 0 ||
     s.name.toLowerCase().includes(supplierQuery.toLowerCase()) ||
     s.id.toLowerCase().includes(supplierQuery.toLowerCase()) ||
@@ -121,7 +114,7 @@ export function UploadScreen() {
           supplierInput = `[Files uploaded: ${files.map(f => f.name).join(', ')}]`;
         }
       }
-      const { run_id } = await api.createRun(supplierInput, expName.trim() || undefined);
+      const { run_id } = await api.createRun(supplierInput, expName.trim() || undefined, selectedSupplier);
       navigate(`/listings/${run_id}/processing`, { state: { expName: expName.trim() || 'New listing' } });
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Failed to start pipeline');

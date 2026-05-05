@@ -13,6 +13,9 @@ router = APIRouter(tags=["runs"])
 class CreateRunRequest(BaseModel):
     supplier_input: str
     experience_name: Optional[str] = None
+    supplier_name: Optional[str] = None
+    supplier_city: Optional[str] = None
+    supplier_id: Optional[str] = None
 
 
 class CreateRunResponse(BaseModel):
@@ -44,6 +47,12 @@ async def create_run(
     }
     if body.experience_name:
         row["experience_name"] = body.experience_name
+    if body.supplier_name:
+        row["supplier_name"] = body.supplier_name
+    if body.supplier_city:
+        row["supplier_city"] = body.supplier_city
+    if body.supplier_id:
+        row["supplier_id"] = body.supplier_id
     if user.get("id"):
         row["created_by"] = user["id"]
     if user.get("email"):
@@ -51,6 +60,18 @@ async def create_run(
     await supabase_service.insert_run(row)
     background_tasks.add_task(pipeline_service.launch_pipeline, run_id, body.supplier_input)
     return CreateRunResponse(run_id=run_id, status="pending")
+
+
+@router.get("/suppliers")
+async def list_suppliers(
+    user: dict = Depends(get_current_user),
+) -> list[dict[str, Any]]:
+    from backend.services import supabase_service
+    client = supabase_service._get_client()
+    if client is None:
+        return []
+    resp = client.table("suppliers").select("id,name,city").order("name").execute()
+    return resp.data or []
 
 
 @router.get("/runs")
