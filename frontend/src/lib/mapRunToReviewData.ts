@@ -1,4 +1,4 @@
-import type { FieldData, FieldStatus, ReviewBlocker, ReviewWarning, ReviewData, PricingTier, PricingVariant, PriceUnit } from '../types';
+import type { FieldData, FieldSource, FieldStatus, ReviewBlocker, ReviewWarning, ReviewData, PricingTier, PricingVariant, PriceUnit } from '../types';
 
 function fieldStatus(
   fieldPath: string,
@@ -22,14 +22,36 @@ function fieldAction(fieldPath: string, blockers: ReviewBlocker[]): ReviewBlocke
   return blockers.find(b => b.field.includes(fieldPath))?.action_required;
 }
 
-function sourceLabel(sources: Record<string, string>, path: string): string | null {
-  const type = sources?.[path];
+function getSourceType(sources: Record<string, string>, path: string): string | null {
+  if (sources[path]) return sources[path];
+  if (sources[`${path}.0`]) return sources[`${path}.0`];
+  const prefix = `${path}.`;
+  const key = Object.keys(sources).find(k => k.startsWith(prefix));
+  return key ? sources[key] : null;
+}
+
+function getSupplierQuote(flagMap: Map<string, string>, path: string): string | null {
+  if (flagMap.has(path)) return flagMap.get(path)!;
+  if (flagMap.has(`${path}.0`)) return flagMap.get(`${path}.0`)!;
+  const prefix = `${path}.`;
+  for (const [k, v] of flagMap) {
+    if (k.startsWith(prefix)) return v;
+  }
+  return null;
+}
+
+function makeSource(
+  sources: Record<string, string>,
+  flagMap: Map<string, string>,
+  path: string,
+): FieldSource | null {
+  const type = getSourceType(sources, path);
   if (!type) return null;
-  if (type === 'EXPLICIT') return 'From supplier input';
-  if (type === 'INFERRED') return 'Inferred from supplier context';
-  if (type === 'DEFAULT') return 'Pipeline default';
-  if (type === 'AGENT-GENERATED') return 'AI-generated';
-  return type;
+  if (type === 'AGENT-GENERATED') return { kind: 'ai', quote: null };
+  if (type === 'DEFAULT') return null;
+  // EXPLICIT or INFERRED → supplier data
+  const quote = getSupplierQuote(flagMap, path);
+  return { kind: 'supplier', quote };
 }
 
 function pricingTierLabel(ageGroup: string, minAge?: number | null, maxAge?: number | null): string {
@@ -59,12 +81,30 @@ function cancelTiersToText(tiers: CancelTier[]): string {
   }).join(' · ');
 }
 
+interface AmbiguityFlagRaw {
+  field: string;
+  supplier_text?: string | null;
+}
+
 export function mapRunToReviewData(
   mergedListing: Record<string, unknown>,
+  intakeArtifact?: Record<string, unknown>,
 ): ReviewData {
   const listing = (mergedListing.listing ?? {}) as Record<string, unknown>;
   const intakePayload = (mergedListing.intake_payload ?? {}) as Record<string, unknown>;
-  const sources = (intakePayload._sources ?? {}) as Record<string, string>;
+
+  // Prefer _sources and ambiguity_flags from the separate intake artifact (which has
+  // the full intake.json content), falling back to intake_payload for older runs.
+  const intakeFull = (intakeArtifact ?? intakePayload) as Record<string, unknown>;
+  const sources = (intakeFull._sources ?? intakePayload._sources ?? {}) as Record<string, string>;
+  const rawFlags = (intakeFull.ambiguity_flags ?? []) as AmbiguityFlagRaw[];
+
+  // Build lookup: field path → supplier quote (only entries that actually have text)
+  const flagMap = new Map<string, string>(
+    rawFlags
+      .filter(f => f.supplier_text)
+      .map(f => [f.field, f.supplier_text as string]),
+  );
 
   const reviewSection = (mergedListing as Record<string, unknown>);
   const reviewData = reviewSection.review as Record<string, unknown> | undefined;
@@ -88,7 +128,7 @@ export function mapRunToReviewData(
     value: h,
     status: fieldStatus(`highlights[${i}]`, blockers, warnings),
     reason: fixReason(`highlights[${i}]`, blockers, warnings),
-    source: sourceLabel(sources, 'highlights'),
+    source: makeSource(sources, flagMap, 'highlights'),
     action: fieldAction(`highlights[${i}]`, blockers),
   } satisfies FieldData));
 
@@ -98,7 +138,7 @@ export function mapRunToReviewData(
     value: inc,
     status: fieldStatus(`inclusions[${i}]`, blockers, warnings),
     reason: fixReason(`inclusions[${i}]`, blockers, warnings),
-    source: sourceLabel(sources, 'inclusions'),
+    source: makeSource(sources, flagMap, 'inclusions'),
     action: fieldAction(`inclusions[${i}]`, blockers),
   } satisfies FieldData));
 
@@ -108,7 +148,7 @@ export function mapRunToReviewData(
     value: ex,
     status: fieldStatus(`exclusions[${i}]`, blockers, warnings),
     reason: fixReason(`exclusions[${i}]`, blockers, warnings),
-    source: sourceLabel(sources, 'exclusions'),
+    source: makeSource(sources, flagMap, 'exclusions'),
     action: fieldAction(`exclusions[${i}]`, blockers),
   } satisfies FieldData));
 
@@ -122,8 +162,8 @@ export function mapRunToReviewData(
       status: fieldStatus(`faqs[${i}].question`, blockers, warnings),
       reason: fixReason(`faqs[${i}].question`, blockers, warnings),
       source: faq.paa_source
-        ? `Google users also ask: "${faq.paa_source}"`
-        : sourceLabel(sources, 'faqs'),
+        ? { kind: 'google' as const, quote: faq.paa_source }
+        : makeSource(sources, flagMap, 'faqs'),
       action: fieldAction(`faqs[${i}].question`, blockers),
     } satisfies FieldData,
     {
@@ -133,8 +173,8 @@ export function mapRunToReviewData(
       status: fieldStatus(`faqs[${i}].answer`, blockers, warnings),
       reason: fixReason(`faqs[${i}].answer`, blockers, warnings),
       source: faq.paa_source
-        ? `Google users also ask: "${faq.paa_source}"`
-        : sourceLabel(sources, 'faqs'),
+        ? { kind: 'google' as const, quote: faq.paa_source }
+        : makeSource(sources, flagMap, 'faqs'),
       action: fieldAction(`faqs[${i}].answer`, blockers),
     } satisfies FieldData,
   ]);
@@ -193,7 +233,7 @@ export function mapRunToReviewData(
       value: titleOptions.length === 1 ? titleOptions[0] : undefined,
       status: fieldStatus('listing.title', blockers, warnings),
       reason: fixReason('listing.title', blockers, warnings),
-      source: sourceLabel(sources, 'productName'),
+      source: makeSource(sources, flagMap, 'productName'),
       action: fieldAction('listing.title', blockers),
     },
     descHook: {
@@ -203,7 +243,7 @@ export function mapRunToReviewData(
       value: descOptions.length === 1 ? descOptions[0] : undefined,
       status: fieldStatus('listing.description', blockers, warnings),
       reason: fixReason('listing.description', blockers, warnings),
-      source: sourceLabel(sources, 'description'),
+      source: makeSource(sources, flagMap, 'description'),
       action: fieldAction('listing.description', blockers),
     },
     highlights,
@@ -219,7 +259,7 @@ export function mapRunToReviewData(
       reason: cancelIncomplete
         ? 'Tiered policy detected but no tier details were extracted. Update manually or raise with supplier.'
         : fixReason('cancellationPolicy', blockers, warnings),
-      source: sourceLabel(sources, 'cancellationPolicy'),
+      source: makeSource(sources, flagMap, 'cancellationPolicy'),
       action: cancelIncomplete ? 'associate_action' : fieldAction('cancellationPolicy', blockers),
     },
     seoNote: {

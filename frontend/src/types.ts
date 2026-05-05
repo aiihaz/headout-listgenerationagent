@@ -105,6 +105,11 @@ export interface ListingRow {
   runId: string;
 }
 
+export interface FieldSource {
+  kind: 'supplier' | 'google' | 'ai';
+  quote: string | null;
+}
+
 export interface FieldData {
   id?: string;
   label: string;
@@ -112,7 +117,7 @@ export interface FieldData {
   options?: string[];    // A/B/C variants
   status: FieldStatus;
   reason?: string;
-  source: string | null;
+  source: FieldSource | null;
   action?: 'regenerate' | 'associate_action';
 }
 

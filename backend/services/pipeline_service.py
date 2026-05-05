@@ -95,7 +95,9 @@ async def _persist_artifacts(run_id: str) -> None:
     """After pipeline completes, push filesystem artifacts to Supabase run_artifacts."""
     run_dir = LISTINGS_DIR / run_id
     for artifact_type, filename in _ARTIFACT_FILES.items():
-        path = run_dir / filename
+        stem = filename.replace(".json", "")
+        v2_path = run_dir / f"{stem}_v2.json"
+        path = v2_path if v2_path.exists() else run_dir / filename
         if not path.exists():
             continue
         try:

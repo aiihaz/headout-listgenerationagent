@@ -122,7 +122,8 @@ export function ReviewScreen() {
       const merged = run.artifacts?.merged_listing as Record<string, unknown> | undefined;
       if (merged) {
         const reviewArtifact = run.artifacts?.review as Record<string, unknown> | undefined;
-        const data = mapRunToReviewData({ ...merged, review: reviewArtifact?.review });
+        const intakeArtifact = run.artifacts?.intake as Record<string, unknown> | undefined;
+        const data = mapRunToReviewData({ ...merged, review: reviewArtifact?.review }, intakeArtifact);
         setReviewData(data);
         setTotalFlags(buildFlagList(data).length);
       }
@@ -185,7 +186,8 @@ export function ReviewScreen() {
       const merged = run.artifacts?.merged_listing as Record<string, unknown> | undefined;
       if (merged) {
         const reviewArtifact = run.artifacts?.review as Record<string, unknown> | undefined;
-        const data = mapRunToReviewData({ ...merged, review: reviewArtifact?.review });
+        const intakeArtifact = run.artifacts?.intake as Record<string, unknown> | undefined;
+        const data = mapRunToReviewData({ ...merged, review: reviewArtifact?.review }, intakeArtifact);
         setReviewData(data);
         setTotalFlags(buildFlagList(data).length);
         setResolvedSections({});
@@ -512,14 +514,14 @@ export function ReviewScreen() {
           <FieldComponent field={reviewData.title} showSource={showSourceQuotes}
             initialResolved={isPublished || resolvedFieldIds.has('title')}
             onResolve={() => markFieldResolved('title', 's-title')}
-            onRegenerate={reviewData.title.action === 'regenerate' ? makeRegenerator('listing.title', reviewData.title.reason) : undefined} />
+            onRegenerate={makeRegenerator('listing.title', reviewData.title.reason)} />
         </Section>
 
         <Section id="s-desc">
           <FieldComponent field={reviewData.descHook} showSource={showSourceQuotes}
             initialResolved={isPublished || resolvedFieldIds.has('desc')}
             onResolve={() => markFieldResolved('desc', 's-desc')}
-            onRegenerate={reviewData.descHook.action === 'regenerate' ? makeRegenerator('listing.description', reviewData.descHook.reason) : undefined} />
+            onRegenerate={makeRegenerator('listing.description', reviewData.descHook.reason)} />
         </Section>
 
         <Section id="s-highlights">
@@ -527,7 +529,7 @@ export function ReviewScreen() {
             <FieldComponent key={h.id} field={h} showSource={showSourceQuotes}
               initialResolved={isPublished || resolvedFieldIds.has(h.id ?? '')}
               onResolve={h.status !== 'ready' ? () => markFieldResolved(h.id ?? '', 's-highlights') : undefined}
-              onRegenerate={h.action === 'regenerate' ? makeRegenerator('highlights', h.reason) : undefined} />
+              onRegenerate={makeRegenerator('highlights', h.reason)} />
           ))}
         </Section>
 
@@ -536,7 +538,7 @@ export function ReviewScreen() {
             <FieldComponent key={h.id} field={h} showSource={showSourceQuotes}
               initialResolved={isPublished || resolvedFieldIds.has(h.id ?? '')}
               onResolve={h.status !== 'ready' ? () => markFieldResolved(h.id ?? '', 's-inclusions') : undefined}
-              onRegenerate={h.action === 'regenerate' ? makeRegenerator('inclusions', h.reason) : undefined} />
+              onRegenerate={makeRegenerator('inclusions', h.reason)} />
           ))}
         </Section>
 
@@ -545,7 +547,7 @@ export function ReviewScreen() {
             <FieldComponent key={h.id} field={h} showSource={showSourceQuotes}
               initialResolved={isPublished || resolvedFieldIds.has(h.id ?? '')}
               onResolve={h.status !== 'ready' ? () => markFieldResolved(h.id ?? '', 's-exclusions') : undefined}
-              onRegenerate={h.action === 'regenerate' ? makeRegenerator('exclusions', h.reason) : undefined} />
+              onRegenerate={makeRegenerator('exclusions', h.reason)} />
           ))}
         </Section>
 
@@ -554,7 +556,7 @@ export function ReviewScreen() {
             <FieldComponent key={f.id} field={f} showSource={showSourceQuotes}
               initialResolved={isPublished || resolvedFieldIds.has(f.id ?? '')}
               onResolve={f.status !== 'ready' ? () => markFieldResolved(f.id ?? '', 's-faqs') : undefined}
-              onRegenerate={f.action === 'regenerate' ? makeRegenerator('faqs', f.reason) : undefined} />
+              onRegenerate={makeRegenerator('faqs', f.reason)} />
           ))}
         </Section>
 
@@ -568,14 +570,14 @@ export function ReviewScreen() {
           <FieldComponent field={reviewData.seoNote} showSource={showSourceQuotes}
             initialResolved={isPublished || resolvedFieldIds.has('seo')}
             onResolve={() => markFieldResolved('seo', 's-seo')}
-            onRegenerate={reviewData.seoNote.action === 'regenerate' ? makeRegenerator('seo', reviewData.seoNote.reason) : undefined} />
+            onRegenerate={makeRegenerator('seo', reviewData.seoNote.reason)} />
         </Section>
 
         <Section id="s-cancel">
           <FieldComponent field={reviewData.cancellation} showSource={showSourceQuotes}
             initialResolved={isPublished || resolvedFieldIds.has('cancel')}
             onResolve={() => markFieldResolved('cancel', 's-cancel')}
-            onRegenerate={reviewData.cancellation.action === 'regenerate' ? makeRegenerator('cancellationPolicy', reviewData.cancellation.reason) : undefined} />
+            onRegenerate={makeRegenerator('cancellationPolicy', reviewData.cancellation.reason)} />
         </Section>
       </div>
     </div>

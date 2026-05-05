@@ -200,12 +200,22 @@ def run(
     # can't fix. The second pass will escalate if regen didn't resolve the issues.
     ctx.state = PipelineState.REGENERATION_IN_PROGRESS
     _notify(ctx.state, status_callback)
+    # Exclude _meta.* warnings — those are supplier-level constraints, not regeneratable content
+    content_warnings = [w for w in all_warnings if not w.field.startswith("_meta.")]
     warning_fix_items = [
         {"field": w.field, "found": w.issue, "intake_says": "n/a", "fix_instruction": w.suggestion}
-        for w in all_warnings
+        for w in content_warnings
     ]
     blockers = [b.model_dump() for b in regen_blockers] + warning_fix_items
-    scope = [b.field for b in regen_blockers] + [w.field for w in all_warnings]
+    scope = [b.field for b in regen_blockers] + [w.field for w in content_warnings]
+
+    # If nothing is actually regeneratable (only _meta warnings and associate blockers), surface as-is
+    if not blockers:
+        ctx.state = PipelineState.READY_FOR_PUBLISH
+        ctx.finished_at = datetime.now(timezone.utc).isoformat()
+        _notify(ctx.state, status_callback, flag_count=len(associate_blockers))
+        _save_final(run_dir, ctx)
+        return _result(ctx)
 
     try:
         regen_listing = content_generator.run_targeted_regen(
@@ -213,7 +223,9 @@ def run(
             serper_context=ctx.serper_context,
         )
         ctx.merged_listing = _merge(regen_listing, ctx.json_ld)
-        _save(run_dir / "merged_listing_v2.json", _merged_to_dict(ctx.merged_listing, ctx.intake))
+        merged_dict = _merged_to_dict(ctx.merged_listing, ctx.intake)
+        _save(run_dir / "merged_listing.json", merged_dict)   # update canonical so UI sees regen output
+        _save(run_dir / "merged_listing_v2.json", merged_dict)
     except Exception as exc:
         ctx.state = PipelineState.ESCALATED_TO_HUMAN
         ctx.error = str(exc)
@@ -224,7 +236,9 @@ def run(
     # Second review pass
     try:
         ctx.review = review_agent.run(ctx.intake, ctx.merged_listing, client, is_regen_pass=True, serper_context=ctx.serper_context)
-        _save(run_dir / "review_v2.json", ctx.review.model_dump())
+        review_dict = ctx.review.model_dump()
+        _save(run_dir / "review.json", review_dict)           # update canonical
+        _save(run_dir / "review_v2.json", review_dict)
     except Exception as exc:
         ctx.state = PipelineState.ESCALATED_TO_HUMAN
         ctx.error = str(exc)
@@ -233,12 +247,16 @@ def run(
         return _result(ctx)
 
     post_regen_regen = [b for b in ctx.review.review.blockers if b.action_required == "regenerate"]
+    remaining_flags = (
+        len(ctx.review.review.blockers)
+        + len([w for w in ctx.review.review.warnings if not w.field.startswith("_meta.")])
+    )
     if ctx.review.review.overall in ("pass", "conditional_pass") or not post_regen_regen:
         ctx.state = PipelineState.READY_FOR_PUBLISH
-        final_flag_count = 0
+        final_flag_count = remaining_flags
     else:
         ctx.state = PipelineState.ESCALATED_TO_HUMAN
-        final_flag_count = len(ctx.review.review.blockers)
+        final_flag_count = remaining_flags
         _save_escalation(run_dir, ctx)
 
     _notify(ctx.state, status_callback, flag_count=final_flag_count)

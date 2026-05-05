@@ -117,11 +117,27 @@ export function FieldComponent({ field, showSource = true, onResolve, onRegenera
                 background: '#fff', border: '1px solid var(--border)', borderRadius: 10,
                 padding: 14, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 50,
               }}>
-                <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink60)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Source quote</p>
-                {field.source ? (
-                  <p style={{ fontSize: 12, color: 'var(--slate)', lineHeight: 1.5, fontStyle: 'italic' }}>{field.source}</p>
+                {field.source?.kind === 'supplier' ? (
+                  <>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink60)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Supplier PDF</p>
+                    {field.source.quote ? (
+                      <p style={{ fontSize: 12, color: 'var(--slate)', lineHeight: 1.5, fontStyle: 'italic' }}>"{field.source.quote}"</p>
+                    ) : (
+                      <p style={{ fontSize: 12, color: 'var(--ink60)', lineHeight: 1.5 }}>Extracted directly from supplier document.</p>
+                    )}
+                  </>
+                ) : field.source?.kind === 'google' ? (
+                  <>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink60)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Google search</p>
+                    {field.source.quote && (
+                      <p style={{ fontSize: 12, color: 'var(--slate)', lineHeight: 1.5, fontStyle: 'italic' }}>"{field.source.quote}"</p>
+                    )}
+                  </>
                 ) : (
-                  <p style={{ fontSize: 12, color: 'var(--ink60)', lineHeight: 1.5 }}>AI-generated — no direct supplier quote.</p>
+                  <>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink60)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Source</p>
+                    <p style={{ fontSize: 12, color: 'var(--ink60)', lineHeight: 1.5 }}>AI-generated — no direct supplier quote.</p>
+                  </>
                 )}
               </div>
             )}
@@ -244,7 +260,12 @@ export function FieldComponent({ field, showSource = true, onResolve, onRegenera
               ) : (
                 <p style={{ fontSize: 13, color: 'var(--ink60)', marginBottom: 8, fontStyle: 'italic' }}>No additional context from the review agent.</p>
               )}
-              {field.source && <p style={{ fontSize: 12, color: 'var(--ink60)', fontStyle: 'italic', marginBottom: 10 }}>"{field.source}"</p>}
+              {field.source?.kind === 'supplier' && field.source.quote && (
+                <p style={{ fontSize: 12, color: 'var(--ink60)', fontStyle: 'italic', marginBottom: 10 }}>Supplier PDF: "{field.source.quote}"</p>
+              )}
+              {field.source?.kind === 'google' && field.source.quote && (
+                <p style={{ fontSize: 12, color: 'var(--ink60)', fontStyle: 'italic', marginBottom: 10 }}>Google search: "{field.source.quote}"</p>
+              )}
               {!resolved && (
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   <button onClick={() => { setEditStartVal(val); setEditStartTab(activeTab); setEditing(true); }} style={{
