@@ -51,6 +51,7 @@ export interface ApiRun {
   updated_at?: string;
   error_message?: string | null;
   flag_count?: number | null;
+  created_by_email?: string | null;
 }
 
 export interface ReviewBlocker {

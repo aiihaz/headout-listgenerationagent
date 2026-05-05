@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Plus, Inbox, RefreshCw } from 'lucide-react';
 import { api } from '../lib/api';
-import { supabase } from '../lib/supabase';
 import type { ListingRow, ApiRun } from '../types';
 import { runStatusToListingStatus } from '../types';
 
@@ -30,6 +29,13 @@ function timeAgo(iso?: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+function initialsFromEmail(email?: string | null): string {
+  if (!email) return '?';
+  const name = email.split('@')[0];
+  const parts = name.split(/[\s._-]+/).filter(Boolean);
+  return parts.slice(0, 2).map(p => p[0].toUpperCase()).join('') || '?';
+}
+
 function rowFromApiRun(run: ApiRun): ListingRow {
   const listingStatus = runStatusToListingStatus(run.status);
   const experienceName = run.experience_name?.trim()
@@ -44,7 +50,7 @@ function rowFromApiRun(run: ApiRun): ListingRow {
     verdict: verdictFromStatus(run.status, run.flag_count),
     flags: run.flag_count ?? null,
     updated: timeAgo(run.updated_at ?? run.created_at),
-    assignee: 'IH',
+    assignee: initialsFromEmail(run.created_by_email),
   };
 }
 
@@ -61,20 +67,6 @@ export function Dashboard() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('All');
-  const [userInitials, setUserInitials] = useState('?');
-
-  useEffect(() => {
-    if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => {
-      const user = data.session?.user;
-      if (!user) return;
-      const fullName = user.user_metadata?.full_name as string | undefined;
-      const email = user.email ?? '';
-      const name = fullName || email.split('@')[0];
-      const parts = name.split(/[\s._-]+/).filter(Boolean);
-      setUserInitials(parts.slice(0, 2).map((p: string) => p[0].toUpperCase()).join('') || '?');
-    });
-  }, []);
   const [listings, setListings] = useState<ListingRow[]>(() => {
     try {
       const cached = localStorage.getItem(CACHE_KEY);
@@ -235,7 +227,7 @@ export function Dashboard() {
                         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: 11, fontWeight: 700, color: 'var(--purps)',
                       }}>
-                        {userInitials}
+                        {l.assignee}
                       </span>
                     </td>
                   </tr>

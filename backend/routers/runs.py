@@ -46,6 +46,8 @@ async def create_run(
         row["experience_name"] = body.experience_name
     if user.get("id"):
         row["created_by"] = user["id"]
+    if user.get("email"):
+        row["created_by_email"] = user["email"]
     await supabase_service.insert_run(row)
     background_tasks.add_task(pipeline_service.launch_pipeline, run_id, body.supplier_input)
     return CreateRunResponse(run_id=run_id, status="pending")
