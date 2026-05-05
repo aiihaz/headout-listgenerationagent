@@ -1,25 +1,48 @@
 import type { FieldData, FieldSource, FieldStatus, ReviewBlocker, ReviewWarning, ReviewData, PricingTier, PricingVariant, PriceUnit } from '../types';
 
+/**
+ * Returns true when a blocker/warning `field` path belongs to the UI card
+ * identified by `cardPath`.
+ *
+ * A blocker at path F matches card path Q when:
+ *   - F === Q  (exact match), OR
+ *   - F starts with Q + '.'  (F is a sub-field of Q, e.g. Q="listing.title", F="listing.title.primary"), OR
+ *   - F starts with Q + '['  (F is an indexed element of Q, e.g. Q="listing.highlights[0]", F="listing.highlights[0]")
+ *
+ * This is intentionally a prefix/ancestor check — NOT a substring search.
+ * It prevents false positives such as:
+ *   - "listing.description.full.section_1.body" matching the descHook card
+ *     (queried as "listing.description.short") because the old code used .includes()
+ *   - "listing.seo.title" matching the seoNote card (queried as "listing.seo.tags")
+ */
+function pathMatches(reviewField: string, cardPath: string): boolean {
+  return (
+    reviewField === cardPath ||
+    reviewField.startsWith(cardPath + '.') ||
+    reviewField.startsWith(cardPath + '[')
+  );
+}
+
 function fieldStatus(
   fieldPath: string,
   blockers: ReviewBlocker[],
   warnings: ReviewWarning[],
 ): FieldStatus {
-  if (blockers.some(b => b.field.includes(fieldPath))) return 'flag';
-  if (warnings.some(w => w.field.includes(fieldPath))) return 'flag';
+  if (blockers.some(b => pathMatches(b.field, fieldPath))) return 'flag';
+  if (warnings.some(w => pathMatches(w.field, fieldPath))) return 'flag';
   return 'ready';
 }
 
 function fixReason(fieldPath: string, blockers: ReviewBlocker[], warnings: ReviewWarning[]): string | undefined {
-  const blocker = blockers.find(b => b.field.includes(fieldPath));
+  const blocker = blockers.find(b => pathMatches(b.field, fieldPath));
   if (blocker) return blocker.fix_instruction;
-  const warning = warnings.find(w => w.field.includes(fieldPath));
+  const warning = warnings.find(w => pathMatches(w.field, fieldPath));
   if (warning) return `${warning.issue} ${warning.suggestion}`.trim();
   return undefined;
 }
 
 function fieldAction(fieldPath: string, blockers: ReviewBlocker[]): ReviewBlocker['action_required'] | undefined {
-  return blockers.find(b => b.field.includes(fieldPath))?.action_required;
+  return blockers.find(b => pathMatches(b.field, fieldPath))?.action_required;
 }
 
 function getSourceType(sources: Record<string, string>, path: string): string | null {
@@ -126,30 +149,30 @@ export function mapRunToReviewData(
     id: `h${i + 1}`,
     label: `Highlight ${i + 1}`,
     value: h,
-    status: fieldStatus(`highlights[${i}]`, blockers, warnings),
-    reason: fixReason(`highlights[${i}]`, blockers, warnings),
+    status: fieldStatus(`listing.highlights[${i}]`, blockers, warnings),
+    reason: fixReason(`listing.highlights[${i}]`, blockers, warnings),
     source: makeSource(sources, flagMap, 'highlights'),
-    action: fieldAction(`highlights[${i}]`, blockers),
+    action: fieldAction(`listing.highlights[${i}]`, blockers),
   } satisfies FieldData));
 
   const inclusions = ((listing.inclusions as string[]) ?? []).map((inc, i) => ({
     id: `inc${i + 1}`,
     label: `Inclusion ${i + 1}`,
     value: inc,
-    status: fieldStatus(`inclusions[${i}]`, blockers, warnings),
-    reason: fixReason(`inclusions[${i}]`, blockers, warnings),
+    status: fieldStatus(`listing.inclusions[${i}]`, blockers, warnings),
+    reason: fixReason(`listing.inclusions[${i}]`, blockers, warnings),
     source: makeSource(sources, flagMap, 'inclusions'),
-    action: fieldAction(`inclusions[${i}]`, blockers),
+    action: fieldAction(`listing.inclusions[${i}]`, blockers),
   } satisfies FieldData));
 
   const exclusions = ((listing.exclusions as string[]) ?? []).map((ex, i) => ({
     id: `ex${i + 1}`,
     label: `Exclusion ${i + 1}`,
     value: ex,
-    status: fieldStatus(`exclusions[${i}]`, blockers, warnings),
-    reason: fixReason(`exclusions[${i}]`, blockers, warnings),
+    status: fieldStatus(`listing.exclusions[${i}]`, blockers, warnings),
+    reason: fixReason(`listing.exclusions[${i}]`, blockers, warnings),
     source: makeSource(sources, flagMap, 'exclusions'),
-    action: fieldAction(`exclusions[${i}]`, blockers),
+    action: fieldAction(`listing.exclusions[${i}]`, blockers),
   } satisfies FieldData));
 
   type FaqItem = { question: string; answer: string; paa_source?: string };
@@ -159,23 +182,23 @@ export function mapRunToReviewData(
       id: `fq${i + 1}`,
       label: `FAQ ${i + 1} — Question`,
       value: faq.question,
-      status: fieldStatus(`faqs[${i}].question`, blockers, warnings),
-      reason: fixReason(`faqs[${i}].question`, blockers, warnings),
+      status: fieldStatus(`listing.faqs[${i}].question`, blockers, warnings),
+      reason: fixReason(`listing.faqs[${i}].question`, blockers, warnings),
       source: faq.paa_source
         ? { kind: 'google' as const, quote: faq.paa_source }
         : makeSource(sources, flagMap, 'faqs'),
-      action: fieldAction(`faqs[${i}].question`, blockers),
+      action: fieldAction(`listing.faqs[${i}].question`, blockers),
     } satisfies FieldData,
     {
       id: `fa${i + 1}`,
       label: `FAQ ${i + 1} — Answer`,
       value: faq.answer,
-      status: fieldStatus(`faqs[${i}].answer`, blockers, warnings),
-      reason: fixReason(`faqs[${i}].answer`, blockers, warnings),
+      status: fieldStatus(`listing.faqs[${i}].answer`, blockers, warnings),
+      reason: fixReason(`listing.faqs[${i}].answer`, blockers, warnings),
       source: faq.paa_source
         ? { kind: 'google' as const, quote: faq.paa_source }
         : makeSource(sources, flagMap, 'faqs'),
-      action: fieldAction(`faqs[${i}].answer`, blockers),
+      action: fieldAction(`listing.faqs[${i}].answer`, blockers),
     } satisfies FieldData,
   ]);
 
@@ -241,10 +264,10 @@ export function mapRunToReviewData(
       label: 'Description hook',
       options: descOptions.length > 1 ? descOptions : undefined,
       value: descOptions.length === 1 ? descOptions[0] : undefined,
-      status: fieldStatus('listing.description', blockers, warnings),
-      reason: fixReason('listing.description', blockers, warnings),
+      status: fieldStatus('listing.description.short', blockers, warnings),
+      reason: fixReason('listing.description.short', blockers, warnings),
       source: makeSource(sources, flagMap, 'description'),
-      action: fieldAction('listing.description', blockers),
+      action: fieldAction('listing.description.short', blockers),
     },
     highlights,
     inclusions,
@@ -266,10 +289,10 @@ export function mapRunToReviewData(
       id: 'seo',
       label: 'SEO tags',
       value: tags.join(', ') || (seoObj?.metaDescription as string) || '',
-      status: fieldStatus('seo', blockers, []),
-      reason: fixReason('seo', blockers, []),
+      status: fieldStatus('listing.seo.tags', blockers, warnings),
+      reason: fixReason('listing.seo.tags', blockers, warnings),
       source: null,
-      action: fieldAction('seo', blockers),
+      action: fieldAction('listing.seo.tags', blockers),
     },
   };
 }
