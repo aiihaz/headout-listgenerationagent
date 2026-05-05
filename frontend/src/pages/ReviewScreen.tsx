@@ -100,6 +100,7 @@ export function ReviewScreen() {
   const [totalFlags, setTotalFlags] = useState(0);
   const [loadingRun, setLoadingRun] = useState(!!runId);
   const [resolvedSections, setResolvedSections] = useState<Record<string, number>>({});
+  const [resolvedFieldIds, setResolvedFieldIds] = useState<Set<string>>(new Set());
 
   const ALL_SECTION_IDS = ['s-title', 's-desc', 's-highlights', 's-inclusions', 's-exclusions', 's-faqs', 's-pricing', 's-seo', 's-cancel'];
 
@@ -107,6 +108,8 @@ export function ReviewScreen() {
     if (!runId) return;
     const saved = localStorage.getItem(`review-resolved-${runId}`);
     if (saved) { try { setResolvedSections(JSON.parse(saved)); } catch {} }
+    const savedFields = localStorage.getItem(`review-resolved-fields-${runId}`);
+    if (savedFields) { try { setResolvedFieldIds(new Set(JSON.parse(savedFields))); } catch {} }
   }, [runId]);
 
   useEffect(() => {
@@ -127,6 +130,7 @@ export function ReviewScreen() {
         const allResolved = Object.fromEntries(ALL_SECTION_IDS.map(id => [id, 99]));
         setResolvedSections(allResolved);
         if (runId) localStorage.setItem(`review-resolved-${runId}`, JSON.stringify(allResolved));
+        // Field-level resolution handled by isPublished check in render
       }
     }).catch(() => {
       // Keep empty state on error
@@ -163,6 +167,16 @@ export function ReviewScreen() {
     });
   };
 
+  const markFieldResolved = (fieldId: string, sectionId: string) => {
+    setResolvedFieldIds(prev => {
+      const next = new Set(prev);
+      next.add(fieldId);
+      if (runId) localStorage.setItem(`review-resolved-fields-${runId}`, JSON.stringify([...next]));
+      return next;
+    });
+    markSectionResolved(sectionId);
+  };
+
   const reloadRun = () => {
     if (!runId) return;
     setLoadingRun(true);
@@ -175,7 +189,11 @@ export function ReviewScreen() {
         setReviewData(data);
         setTotalFlags(buildFlagList(data).length);
         setResolvedSections({});
-        if (runId) localStorage.removeItem(`review-resolved-${runId}`);
+        setResolvedFieldIds(new Set());
+        if (runId) {
+          localStorage.removeItem(`review-resolved-${runId}`);
+          localStorage.removeItem(`review-resolved-fields-${runId}`);
+        }
       }
     }).catch(() => {}).finally(() => setLoadingRun(false));
   };
@@ -492,20 +510,23 @@ export function ReviewScreen() {
       <div ref={mainRef} style={{ flex: 1, overflow: 'auto', padding: '20px 28px 32px' }}>
         <Section id="s-title">
           <FieldComponent field={reviewData.title} showSource={showSourceQuotes}
-            onResolve={() => markSectionResolved('s-title')}
+            initialResolved={isPublished || resolvedFieldIds.has('title')}
+            onResolve={() => markFieldResolved('title', 's-title')}
             onRegenerate={reviewData.title.action === 'regenerate' ? makeRegenerator('listing.title', reviewData.title.reason) : undefined} />
         </Section>
 
         <Section id="s-desc">
           <FieldComponent field={reviewData.descHook} showSource={showSourceQuotes}
-            onResolve={() => markSectionResolved('s-desc')}
+            initialResolved={isPublished || resolvedFieldIds.has('desc')}
+            onResolve={() => markFieldResolved('desc', 's-desc')}
             onRegenerate={reviewData.descHook.action === 'regenerate' ? makeRegenerator('listing.description', reviewData.descHook.reason) : undefined} />
         </Section>
 
         <Section id="s-highlights">
           {reviewData.highlights.map(h => (
             <FieldComponent key={h.id} field={h} showSource={showSourceQuotes}
-              onResolve={h.status !== 'ready' ? () => markSectionResolved('s-highlights') : undefined}
+              initialResolved={isPublished || resolvedFieldIds.has(h.id ?? '')}
+              onResolve={h.status !== 'ready' ? () => markFieldResolved(h.id ?? '', 's-highlights') : undefined}
               onRegenerate={h.action === 'regenerate' ? makeRegenerator('highlights', h.reason) : undefined} />
           ))}
         </Section>
@@ -513,7 +534,8 @@ export function ReviewScreen() {
         <Section id="s-inclusions">
           {reviewData.inclusions.map(h => (
             <FieldComponent key={h.id} field={h} showSource={showSourceQuotes}
-              onResolve={h.status !== 'ready' ? () => markSectionResolved('s-inclusions') : undefined}
+              initialResolved={isPublished || resolvedFieldIds.has(h.id ?? '')}
+              onResolve={h.status !== 'ready' ? () => markFieldResolved(h.id ?? '', 's-inclusions') : undefined}
               onRegenerate={h.action === 'regenerate' ? makeRegenerator('inclusions', h.reason) : undefined} />
           ))}
         </Section>
@@ -521,7 +543,8 @@ export function ReviewScreen() {
         <Section id="s-exclusions">
           {reviewData.exclusions.map(h => (
             <FieldComponent key={h.id} field={h} showSource={showSourceQuotes}
-              onResolve={h.status !== 'ready' ? () => markSectionResolved('s-exclusions') : undefined}
+              initialResolved={isPublished || resolvedFieldIds.has(h.id ?? '')}
+              onResolve={h.status !== 'ready' ? () => markFieldResolved(h.id ?? '', 's-exclusions') : undefined}
               onRegenerate={h.action === 'regenerate' ? makeRegenerator('exclusions', h.reason) : undefined} />
           ))}
         </Section>
@@ -529,24 +552,29 @@ export function ReviewScreen() {
         <Section id="s-faqs">
           {reviewData.faqs.map(f => (
             <FieldComponent key={f.id} field={f} showSource={showSourceQuotes}
-              onResolve={f.status !== 'ready' ? () => markSectionResolved('s-faqs') : undefined}
+              initialResolved={isPublished || resolvedFieldIds.has(f.id ?? '')}
+              onResolve={f.status !== 'ready' ? () => markFieldResolved(f.id ?? '', 's-faqs') : undefined}
               onRegenerate={f.action === 'regenerate' ? makeRegenerator('faqs', f.reason) : undefined} />
           ))}
         </Section>
 
         <Section id="s-pricing">
-          <PricingTable variants={reviewData.pricing} onResolve={() => markSectionResolved('s-pricing')} />
+          <PricingTable variants={reviewData.pricing}
+            initialResolved={isPublished || resolvedSections['s-pricing'] >= 1}
+            onResolve={() => markSectionResolved('s-pricing')} />
         </Section>
 
         <Section id="s-seo">
           <FieldComponent field={reviewData.seoNote} showSource={showSourceQuotes}
-            onResolve={() => markSectionResolved('s-seo')}
+            initialResolved={isPublished || resolvedFieldIds.has('seo')}
+            onResolve={() => markFieldResolved('seo', 's-seo')}
             onRegenerate={reviewData.seoNote.action === 'regenerate' ? makeRegenerator('seo', reviewData.seoNote.reason) : undefined} />
         </Section>
 
         <Section id="s-cancel">
           <FieldComponent field={reviewData.cancellation} showSource={showSourceQuotes}
-            onResolve={() => markSectionResolved('s-cancel')}
+            initialResolved={isPublished || resolvedFieldIds.has('cancel')}
+            onResolve={() => markFieldResolved('cancel', 's-cancel')}
             onRegenerate={reviewData.cancellation.action === 'regenerate' ? makeRegenerator('cancellationPolicy', reviewData.cancellation.reason) : undefined} />
         </Section>
       </div>

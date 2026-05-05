@@ -174,33 +174,38 @@ def run(
 
     verdict = ctx.review.review.overall
 
-    if verdict in ("pass", "conditional_pass"):
+    if verdict == "pass":
         ctx.state = PipelineState.READY_FOR_PUBLISH
         ctx.finished_at = datetime.now(timezone.utc).isoformat()
         _notify(ctx.state, status_callback, flag_count=0)
         _save_final(run_dir, ctx)
         return _result(ctx)
 
-    # FAIL path — split blockers by action_required
+    # FAIL / conditional_pass path — split blockers by action_required; include all warnings in regen
     all_blockers = ctx.review.review.blockers
+    all_warnings = ctx.review.review.warnings
     regen_blockers = [b for b in all_blockers if b.action_required == "regenerate"]
     associate_blockers = [b for b in all_blockers if b.action_required == "associate_action"]
 
-    # If every blocker is for the associate to resolve (no content to regenerate), surface to review
-    if not regen_blockers:
+    # If only associate-action blockers remain and no warnings, surface to review without regen
+    if not regen_blockers and not all_warnings:
         ctx.state = PipelineState.READY_FOR_PUBLISH
         ctx.finished_at = datetime.now(timezone.utc).isoformat()
         _notify(ctx.state, status_callback, flag_count=len(associate_blockers))
         _save_final(run_dir, ctx)
         return _result(ctx)
 
-    # Always attempt regen when there are regenerate blockers — even if escalate_to_human is true.
+    # Attempt regen for both regenerate-type blockers and all warnings.
     # escalate_to_human on a first pass reflects Review Agent uncertainty, not a blocker the regen
     # can't fix. The second pass will escalate if regen didn't resolve the issues.
     ctx.state = PipelineState.REGENERATION_IN_PROGRESS
     _notify(ctx.state, status_callback)
-    blockers = [b.model_dump() for b in regen_blockers]
-    scope = [b.field for b in regen_blockers]
+    warning_fix_items = [
+        {"field": w.field, "found": w.issue, "intake_says": "n/a", "fix_instruction": w.suggestion}
+        for w in all_warnings
+    ]
+    blockers = [b.model_dump() for b in regen_blockers] + warning_fix_items
+    scope = [b.field for b in regen_blockers] + [w.field for w in all_warnings]
 
     try:
         regen_listing = content_generator.run_targeted_regen(

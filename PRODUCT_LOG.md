@@ -1,7 +1,7 @@
 # Headout AI Listing Generation Pipeline — Product Log
 
 > **Working directory**: `/Users/ihaz/Projects/list generation agent/`
-> **Last updated**: 2026-05-05 (Session 21)
+> **Last updated**: 2026-05-05 (Session 22)
 > **Status**: CLI pipeline complete and **verified end-to-end with OpenAI**. Frontend complete (all 6 screens, wired to real API, **deployed to Vercel**). Backend complete (Phases 1–2), **deployed to Render**. Full production stack live. URL routing overhauled (react-router-dom, `/listings/:id/` scheme, Vercel SPA rewrite). TopNav logout dropdown added. **Frontend: https://headout-listing-agent.vercel.app | Backend: https://headout-listgenerationagent.onrender.com**
 > **Repo**: https://github.com/aiihaz/headout-listgenerationagent (default branch: `staging`)
 
@@ -512,6 +512,49 @@ All 6 screens built, verified in browser, production build passing. See "Fronten
 ---
 
 ## Session History
+
+### Session 22 — Flag persistence across navigation + warnings trigger regen (2026-05-05)
+
+Three changes: per-field flag resolution now persists across navigation, SEO regeneration confirmed to happen in the backend pipeline (not the frontend), and all review warnings now trigger targeted regeneration alongside blockers.
+
+**Per-field flag resolution persistence**
+
+When an associate resolved a flagged field (edited it, saved), navigating away and back (e.g. to PublishConfirm then "Edit listing") reset the field's visual state to flagged because `FieldComponent.resolved` is local React state that resets on remount. The banner correctly showed 0 flags (section-level resolution was persisted), but individual field StatusPills still showed amber.
+
+Fix: added `resolvedFieldIds: Set<string>` persisted to `review-resolved-fields-${runId}` in localStorage. Each `FieldComponent` and `PricingTable` receives an `initialResolved` prop that restores resolved state on remount. Resolving a field now calls `markFieldResolved(fieldId, sectionId)` which updates both the field-level set and the existing section-level counter.
+
+Changes:
+- `frontend/src/components/FieldComponent.tsx` — added `initialResolved?: boolean` prop; initial `resolved` state reads from it; `expanded` starts collapsed if `initialResolved` is true
+- `frontend/src/components/PricingTable.tsx` — added `initialResolved?: boolean` prop; initial `resolved` state reads from it
+- `frontend/src/lib/mapRunToReviewData.ts` — added stable `id: 'title'` and `id: 'desc'` to title and descHook fields (array fields already had IDs)
+- `frontend/src/pages/ReviewScreen.tsx` — added `resolvedFieldIds` state + localStorage load/save; `markFieldResolved()` helper; all `FieldComponent` and `PricingTable` usages pass `initialResolved` and `onResolve` wired to field-level tracking; `reloadRun` clears both localStorage keys
+
+**SEO auto-fix (no frontend change)**
+
+Clarified: the review agent already marks SEO structural violations (3.1–3.8: tag count, title length, meta description) as `action_required: "regenerate"` blockers. The orchestrator's regen loop picks them up automatically during list generation. SEO check 3.9 (primary keyword in title) is a warning, not a blocker — it is now handled by the warnings-trigger-regen change below. No frontend changes needed.
+
+**Warnings trigger targeted regeneration**
+
+Previously, review warnings only surfaced to the review screen — they never triggered automated regeneration. `conditional_pass` results (no blockers, ≥1 meaningful warning) returned immediately. This meant things like poor SEO tag mix, keyword presence, or soft voice issues would always require manual associate action.
+
+Fix: warnings are now included in the regen scope alongside `regenerate`-type blockers.
+
+Changes to `orchestrator.py`:
+- Early return changed from `verdict in ("pass", "conditional_pass")` to `verdict == "pass"` only — `conditional_pass` (meaningful warnings) now falls through to regen
+- `all_warnings = ctx.review.review.warnings` collected alongside `regen_blockers`
+- Short-circuit "nothing to regen" check updated: `if not regen_blockers and not all_warnings`
+- Warnings converted to fix-instruction dicts for `run_targeted_regen`: `{'field': w.field, 'found': w.issue, 'intake_says': 'n/a', 'fix_instruction': w.suggestion}`
+- Scope list extended to include warning field paths
+- If regen resolves all warnings → second pass is `pass` → `READY_FOR_PUBLISH`. If warnings persist → second pass is `conditional_pass` → still `READY_FOR_PUBLISH` with remaining warnings visible on review screen.
+
+**Files modified:**
+- `orchestrator.py`
+- `frontend/src/components/FieldComponent.tsx`
+- `frontend/src/components/PricingTable.tsx`
+- `frontend/src/lib/mapRunToReviewData.ts`
+- `frontend/src/pages/ReviewScreen.tsx`
+
+---
 
 ### Session 21 — Flag system unification + publish persistence (2026-05-05)
 

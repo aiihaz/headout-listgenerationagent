@@ -187,6 +187,7 @@ export function mapRunToReviewData(
 
   return {
     title: {
+      id: 'title',
       label: 'Title',
       options: titleOptions.length > 1 ? titleOptions : undefined,
       value: titleOptions.length === 1 ? titleOptions[0] : undefined,
@@ -196,6 +197,7 @@ export function mapRunToReviewData(
       action: fieldAction('listing.title', blockers),
     },
     descHook: {
+      id: 'desc',
       label: 'Description hook',
       options: descOptions.length > 1 ? descOptions : undefined,
       value: descOptions.length === 1 ? descOptions[0] : undefined,

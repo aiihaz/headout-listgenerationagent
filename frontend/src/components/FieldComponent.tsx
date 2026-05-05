@@ -8,16 +8,17 @@ interface FieldComponentProps {
   showSource?: boolean;
   onResolve?: () => void;
   onRegenerate?: () => Promise<void>;
+  initialResolved?: boolean;
 }
 
-export function FieldComponent({ field, showSource = true, onResolve, onRegenerate }: FieldComponentProps) {
+export function FieldComponent({ field, showSource = true, onResolve, onRegenerate, initialResolved }: FieldComponentProps) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(field.options ? field.options[0] : (field.value ?? ''));
   const [savedVal, setSavedVal] = useState(field.options ? field.options[0] : (field.value ?? ''));
   const [activeTab, setActiveTab] = useState(0);
   const [edited, setEdited] = useState(false);
-  const [expanded, setExpanded] = useState(field.status === 'flag');
-  const [resolved, setResolved] = useState(false);
+  const [expanded, setExpanded] = useState(field.status === 'flag' && !initialResolved);
+  const [resolved, setResolved] = useState(initialResolved ?? false);
   const [sourceOpen, setSourceOpen] = useState(false);
   const [editStartVal, setEditStartVal] = useState('');
   const [editStartTab, setEditStartTab] = useState(0);

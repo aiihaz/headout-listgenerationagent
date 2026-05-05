@@ -123,13 +123,14 @@ function VariantTable({ variant, unit, editing, prices, onPriceChange }: Variant
 interface PricingTableProps {
   variants: PricingVariant[];
   onResolve?: () => void;
+  initialResolved?: boolean;
 }
 
-export function PricingTable({ variants, onResolve }: PricingTableProps) {
+export function PricingTable({ variants, onResolve, initialResolved }: PricingTableProps) {
   const [editing, setEditing] = useState(false);
   const [unitOverride, setUnitOverride] = useState<PriceUnit | null>(null);
   const [unitPickerOpen, setUnitPickerOpen] = useState(false);
-  const [resolved, setResolved] = useState(false);
+  const [resolved, setResolved] = useState(initialResolved ?? false);
 
   const initPrices = () => {
     const map: Record<string, Record<string, number | null>> = {};
