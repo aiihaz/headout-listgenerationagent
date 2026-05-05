@@ -11,8 +11,11 @@ function fieldStatus(
 }
 
 function fixReason(fieldPath: string, blockers: ReviewBlocker[], warnings: ReviewWarning[]): string | undefined {
-  return blockers.find(b => b.field.includes(fieldPath))?.fix_instruction
-    ?? warnings.find(w => w.field.includes(fieldPath))?.message;
+  const blocker = blockers.find(b => b.field.includes(fieldPath));
+  if (blocker) return blocker.fix_instruction;
+  const warning = warnings.find(w => w.field.includes(fieldPath));
+  if (warning) return `${warning.issue} ${warning.suggestion}`.trim();
+  return undefined;
 }
 
 function fieldAction(fieldPath: string, blockers: ReviewBlocker[]): ReviewBlocker['action_required'] | undefined {
@@ -221,10 +224,10 @@ export function mapRunToReviewData(
       id: 'seo',
       label: 'SEO tags',
       value: tags.join(', ') || (seoObj?.metaDescription as string) || '',
-      status: 'ready',
-      reason: undefined,
+      status: fieldStatus('seo', blockers, []),
+      reason: fixReason('seo', blockers, []),
       source: null,
-      action: undefined,
+      action: fieldAction('seo', blockers),
     },
   };
 }

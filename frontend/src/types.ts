@@ -67,7 +67,8 @@ export interface ReviewBlocker {
 export interface ReviewWarning {
   id: string;
   field: string;
-  message: string;
+  issue: string;
+  suggestion: string;
 }
 
 export interface RunArtifacts {

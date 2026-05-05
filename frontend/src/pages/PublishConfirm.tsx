@@ -13,11 +13,20 @@ export function PublishConfirm() {
   const { id: runId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
   const onConfirm = async () => {
     if (!runId) return;
     setPublishing(true);
-    try { await api.publishRun(runId); } catch { /* non-fatal — navigate regardless */ }
-    navigate(`/listings/${runId}/published`);
+    setPublishError(null);
+    try {
+      await api.publishRun(runId);
+      // Invalidate dashboard cache so returning to the list shows Published immediately
+      try { localStorage.removeItem('dashboard_runs_cache'); } catch {}
+      navigate(`/listings/${runId}/published`);
+    } catch (e) {
+      setPublishError(e instanceof Error ? e.message : 'Publish failed — please try again');
+      setPublishing(false);
+    }
   };
   const onEdit = () => navigate(`/listings/${runId}/review`);
   const [checks, setChecks] = useState([false, false, false]);
@@ -108,6 +117,11 @@ export function PublishConfirm() {
             ))}
           </div>
 
+          {publishError && (
+            <div style={{ marginBottom: 12, padding: '10px 14px', background: 'var(--red-bg)', border: '1px solid #FCA5A5', borderRadius: 8, fontSize: 13, color: '#991B1B' }}>
+              {publishError}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 10 }}>
             <button onClick={onEdit} style={{
               flex: 1, height: 44, background: 'transparent', border: '1.5px solid var(--border)',

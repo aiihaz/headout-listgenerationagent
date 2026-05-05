@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pencil, X, Check, ChevronDown } from 'lucide-react';
+import { Pencil, X, Check, ChevronDown, Send } from 'lucide-react';
 import { StatusPill } from './StatusPill';
 import type { PricingVariant, PricingTier, PriceUnit, FieldStatus } from '../types';
 
@@ -164,6 +164,10 @@ export function PricingTable({ variants, onResolve }: PricingTableProps) {
     }
   };
 
+  const handleRaiseWithSupplier = () => {
+    window.dispatchEvent(new CustomEvent('raiseWithSupplier'));
+  };
+
   if (variants.length === 0) {
     return (
       <div style={{ border: '1.5px solid #FDE68A', borderRadius: 10, background: '#fff', marginBottom: 10 }}>
@@ -268,11 +272,27 @@ export function PricingTable({ variants, onResolve }: PricingTableProps) {
       </div>
 
       {/* Missing pricing notice */}
-      {status === 'flag' && (
+      {status === 'flag' && !resolved && (
         <div style={{ borderTop: '1px solid var(--border)', padding: '10px 14px' }}>
-          <p style={{ fontSize: 12, color: '#92400E', fontStyle: 'italic' }}>
-            Pricing is incomplete — confirm with supplier before publishing.
+          <p style={{ fontSize: 12, color: '#92400E', fontStyle: 'italic', marginBottom: 10 }}>
+            Some price tiers are missing — verify with supplier.
           </p>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button onClick={() => setEditing(true)} style={{
+              height: 30, padding: '0 12px', background: '#fff', color: 'var(--slate)',
+              border: '1px solid var(--border)', borderRadius: 6, fontSize: 12, fontWeight: 500,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+            }}>
+              <Pencil size={12} /> Update manually
+            </button>
+            <button onClick={handleRaiseWithSupplier} style={{
+              height: 30, padding: '0 12px', background: '#fff', color: 'var(--slate)',
+              border: '1px solid var(--border)', borderRadius: 6, fontSize: 12, fontWeight: 500,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+            }}>
+              <Send size={12} /> Raise with supplier
+            </button>
+          </div>
         </div>
       )}
     </div>

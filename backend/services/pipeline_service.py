@@ -191,7 +191,7 @@ def _sync_regeneration(
         _save(run_dir / "review_v2.json", review_result.model_dump())
 
         if review_result.review.overall in ("pass", "conditional_pass"):
-            status_q.put(("ready_for_publish", None, len(review_result.review.warnings)))
+            status_q.put(("ready_for_publish", None, 0))
         else:
             # Second failure after associate-initiated regen — escalate
             ctx = PipelineRun(run_id=run_id, state=PipelineState.ESCALATED_TO_HUMAN)

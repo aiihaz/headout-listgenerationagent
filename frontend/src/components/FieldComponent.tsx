@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Pencil, X, Check, Quote, ChevronDown, ChevronUp, Send } from 'lucide-react';
+import { Pencil, X, Check, Quote, ChevronDown, ChevronUp, Send, RefreshCw } from 'lucide-react';
 import { StatusPill } from './StatusPill';
 import type { FieldData, FieldStatus } from '../types';
 
@@ -7,9 +7,10 @@ interface FieldComponentProps {
   field: FieldData;
   showSource?: boolean;
   onResolve?: () => void;
+  onRegenerate?: () => Promise<void>;
 }
 
-export function FieldComponent({ field, showSource = true, onResolve }: FieldComponentProps) {
+export function FieldComponent({ field, showSource = true, onResolve, onRegenerate }: FieldComponentProps) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(field.options ? field.options[0] : (field.value ?? ''));
   const [savedVal, setSavedVal] = useState(field.options ? field.options[0] : (field.value ?? ''));
@@ -20,6 +21,7 @@ export function FieldComponent({ field, showSource = true, onResolve }: FieldCom
   const [sourceOpen, setSourceOpen] = useState(false);
   const [editStartVal, setEditStartVal] = useState('');
   const [editStartTab, setEditStartTab] = useState(0);
+  const [regenerating, setRegenerating] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const isDirty = editing && (val !== editStartVal || activeTab !== editStartTab);
@@ -49,6 +51,7 @@ export function FieldComponent({ field, showSource = true, onResolve }: FieldCom
   };
 
   const handleSave = () => {
+    if (!isDirty) return;
     setSavedVal(val);
     setEditing(false);
     setEdited(true);
@@ -62,6 +65,12 @@ export function FieldComponent({ field, showSource = true, onResolve }: FieldCom
 
   const handleRaiseWithSupplier = () => {
     window.dispatchEvent(new CustomEvent('raiseWithSupplier'));
+  };
+
+  const handleRegenerate = async () => {
+    if (!onRegenerate || regenerating) return;
+    setRegenerating(true);
+    try { await onRegenerate(); } finally { setRegenerating(false); }
   };
 
   return (
@@ -138,13 +147,25 @@ export function FieldComponent({ field, showSource = true, onResolve }: FieldCom
             </button>
           </div>
         ) : (
-          <button onClick={() => { setEditStartVal(val); setEditStartTab(activeTab); setEditing(true); }} style={{
-            display: 'flex', alignItems: 'center', gap: 4, height: 26, padding: '0 10px',
-            borderRadius: 6, border: '1px solid var(--border)', background: '#fff',
-            fontSize: 12, fontWeight: 500, cursor: 'pointer', color: 'var(--ink60)',
-          }}>
-            <Pencil size={12} /> Edit
-          </button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {onRegenerate && status === 'flag' && (
+              <button onClick={handleRegenerate} disabled={regenerating} style={{
+                display: 'flex', alignItems: 'center', gap: 4, height: 26, padding: '0 10px',
+                borderRadius: 6, border: 'none', background: regenerating ? 'var(--ink30)' : 'var(--purps)',
+                fontSize: 12, fontWeight: 600, cursor: regenerating ? 'default' : 'pointer', color: '#fff',
+              }}>
+                <RefreshCw size={12} style={{ animation: regenerating ? 'spin 0.8s linear infinite' : 'none' }} />
+                {regenerating ? 'Regenerating…' : 'Regenerate'}
+              </button>
+            )}
+            <button onClick={() => { setEditStartVal(val); setEditStartTab(activeTab); setEditing(true); }} style={{
+              display: 'flex', alignItems: 'center', gap: 4, height: 26, padding: '0 10px',
+              borderRadius: 6, border: '1px solid var(--border)', background: '#fff',
+              fontSize: 12, fontWeight: 500, cursor: 'pointer', color: 'var(--ink60)',
+            }}>
+              <Pencil size={12} /> Edit
+            </button>
+          </div>
         )}
       </div>
 
@@ -189,7 +210,7 @@ export function FieldComponent({ field, showSource = true, onResolve }: FieldCom
             autoFocus
             onKeyDown={e => {
               if (e.key === 'Escape') handleCancel();
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSave();
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && isDirty) handleSave();
             }}
             style={{
               width: '100%', fontSize: 14, lineHeight: 1.6,

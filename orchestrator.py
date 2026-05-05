@@ -177,7 +177,7 @@ def run(
     if verdict in ("pass", "conditional_pass"):
         ctx.state = PipelineState.READY_FOR_PUBLISH
         ctx.finished_at = datetime.now(timezone.utc).isoformat()
-        _notify(ctx.state, status_callback, flag_count=len(ctx.review.review.warnings))
+        _notify(ctx.state, status_callback, flag_count=0)
         _save_final(run_dir, ctx)
         return _result(ctx)
 
@@ -230,7 +230,7 @@ def run(
     post_regen_regen = [b for b in ctx.review.review.blockers if b.action_required == "regenerate"]
     if ctx.review.review.overall in ("pass", "conditional_pass") or not post_regen_regen:
         ctx.state = PipelineState.READY_FOR_PUBLISH
-        final_flag_count = len(ctx.review.review.warnings)
+        final_flag_count = 0
     else:
         ctx.state = PipelineState.ESCALATED_TO_HUMAN
         final_flag_count = len(ctx.review.review.blockers)

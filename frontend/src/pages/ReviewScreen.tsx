@@ -163,6 +163,41 @@ export function ReviewScreen() {
     });
   };
 
+  const reloadRun = () => {
+    if (!runId) return;
+    setLoadingRun(true);
+    api.getRun(runId).then(run => {
+      if (run.supplier_name) setSupplierName(run.supplier_name);
+      const merged = run.artifacts?.merged_listing as Record<string, unknown> | undefined;
+      if (merged) {
+        const reviewArtifact = run.artifacts?.review as Record<string, unknown> | undefined;
+        const data = mapRunToReviewData({ ...merged, review: reviewArtifact?.review });
+        setReviewData(data);
+        setTotalFlags(buildFlagList(data).length);
+        setResolvedSections({});
+        if (runId) localStorage.removeItem(`review-resolved-${runId}`);
+      }
+    }).catch(() => {}).finally(() => setLoadingRun(false));
+  };
+
+  const makeRegenerator = (sectionId: string, fixInstruction?: string) => {
+    if (!runId) return undefined;
+    return async () => {
+      await api.regenerateSection(runId, sectionId, fixInstruction ?? '');
+      // Poll for completion — regeneration is async on the backend
+      const pollInterval = setInterval(() => {
+        api.getRunStatus(runId).then(status => {
+          if (status.status === 'ready_for_publish' || status.status === 'escalated_to_human') {
+            clearInterval(pollInterval);
+            reloadRun();
+          }
+        }).catch(() => clearInterval(pollInterval));
+      }, 2000);
+      // Safety: stop polling after 3 minutes
+      setTimeout(() => clearInterval(pollInterval), 180_000);
+    };
+  };
+
   function resolvedOrActual(sectionId: string, actual: FieldStatus, resolveThreshold = 1): FieldStatus {
     return resolvedSections[sectionId] >= resolveThreshold ? 'ready' : actual;
   }
@@ -456,38 +491,46 @@ export function ReviewScreen() {
       {/* Main column */}
       <div ref={mainRef} style={{ flex: 1, overflow: 'auto', padding: '20px 28px 32px' }}>
         <Section id="s-title">
-          <FieldComponent field={reviewData.title} showSource={showSourceQuotes} onResolve={() => markSectionResolved('s-title')} />
+          <FieldComponent field={reviewData.title} showSource={showSourceQuotes}
+            onResolve={() => markSectionResolved('s-title')}
+            onRegenerate={reviewData.title.action === 'regenerate' ? makeRegenerator('listing.title', reviewData.title.reason) : undefined} />
         </Section>
 
         <Section id="s-desc">
-          <FieldComponent field={reviewData.descHook} showSource={showSourceQuotes} onResolve={() => markSectionResolved('s-desc')} />
+          <FieldComponent field={reviewData.descHook} showSource={showSourceQuotes}
+            onResolve={() => markSectionResolved('s-desc')}
+            onRegenerate={reviewData.descHook.action === 'regenerate' ? makeRegenerator('listing.description', reviewData.descHook.reason) : undefined} />
         </Section>
 
         <Section id="s-highlights">
           {reviewData.highlights.map(h => (
             <FieldComponent key={h.id} field={h} showSource={showSourceQuotes}
-              onResolve={h.status !== 'ready' ? () => markSectionResolved('s-highlights') : undefined} />
+              onResolve={h.status !== 'ready' ? () => markSectionResolved('s-highlights') : undefined}
+              onRegenerate={h.action === 'regenerate' ? makeRegenerator('highlights', h.reason) : undefined} />
           ))}
         </Section>
 
         <Section id="s-inclusions">
           {reviewData.inclusions.map(h => (
             <FieldComponent key={h.id} field={h} showSource={showSourceQuotes}
-              onResolve={h.status !== 'ready' ? () => markSectionResolved('s-inclusions') : undefined} />
+              onResolve={h.status !== 'ready' ? () => markSectionResolved('s-inclusions') : undefined}
+              onRegenerate={h.action === 'regenerate' ? makeRegenerator('inclusions', h.reason) : undefined} />
           ))}
         </Section>
 
         <Section id="s-exclusions">
           {reviewData.exclusions.map(h => (
             <FieldComponent key={h.id} field={h} showSource={showSourceQuotes}
-              onResolve={h.status !== 'ready' ? () => markSectionResolved('s-exclusions') : undefined} />
+              onResolve={h.status !== 'ready' ? () => markSectionResolved('s-exclusions') : undefined}
+              onRegenerate={h.action === 'regenerate' ? makeRegenerator('exclusions', h.reason) : undefined} />
           ))}
         </Section>
 
         <Section id="s-faqs">
           {reviewData.faqs.map(f => (
             <FieldComponent key={f.id} field={f} showSource={showSourceQuotes}
-              onResolve={f.status !== 'ready' ? () => markSectionResolved('s-faqs') : undefined} />
+              onResolve={f.status !== 'ready' ? () => markSectionResolved('s-faqs') : undefined}
+              onRegenerate={f.action === 'regenerate' ? makeRegenerator('faqs', f.reason) : undefined} />
           ))}
         </Section>
 
@@ -496,11 +539,15 @@ export function ReviewScreen() {
         </Section>
 
         <Section id="s-seo">
-          <FieldComponent field={reviewData.seoNote} showSource={showSourceQuotes} onResolve={() => markSectionResolved('s-seo')} />
+          <FieldComponent field={reviewData.seoNote} showSource={showSourceQuotes}
+            onResolve={() => markSectionResolved('s-seo')}
+            onRegenerate={reviewData.seoNote.action === 'regenerate' ? makeRegenerator('seo', reviewData.seoNote.reason) : undefined} />
         </Section>
 
         <Section id="s-cancel">
-          <FieldComponent field={reviewData.cancellation} showSource={showSourceQuotes} onResolve={() => markSectionResolved('s-cancel')} />
+          <FieldComponent field={reviewData.cancellation} showSource={showSourceQuotes}
+            onResolve={() => markSectionResolved('s-cancel')}
+            onRegenerate={reviewData.cancellation.action === 'regenerate' ? makeRegenerator('cancellationPolicy', reviewData.cancellation.reason) : undefined} />
         </Section>
       </div>
     </div>
