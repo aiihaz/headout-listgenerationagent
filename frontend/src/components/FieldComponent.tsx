@@ -165,7 +165,7 @@ export function FieldComponent({ field, showSource = true, onResolve, onRegenera
           </div>
         ) : (
           <div style={{ display: 'flex', gap: 6 }}>
-            {onRegenerate && status === 'flag' && (
+            {onRegenerate && (
               <button onClick={handleRegenerate} disabled={regenerating} style={{
                 display: 'flex', alignItems: 'center', gap: 4, height: 26, padding: '0 10px',
                 borderRadius: 6, border: 'none', background: regenerating ? 'var(--ink30)' : 'var(--purps)',
