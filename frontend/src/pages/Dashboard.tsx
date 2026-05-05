@@ -156,7 +156,7 @@ export function Dashboard() {
           <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['Experience', 'Status', 'Updated', 'Assigned'].map(h => (
+                {['Supplier', 'Experience', 'City', 'Status', 'Updated', 'Assigned'].map(h => (
                   <th key={h} style={{ padding: '11px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: 'var(--ink60)', letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
@@ -164,7 +164,9 @@ export function Dashboard() {
             <tbody>
               {Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i} style={{ borderBottom: i < 4 ? '1px solid var(--border)' : 'none' }}>
+                  <td style={{ padding: '13px 16px' }}><span style={{ display: 'block', height: 13, width: `${80 + (i % 3) * 30}px`, borderRadius: 6, background: 'var(--ink10)', animation: 'shimmer 1.4s ease-in-out infinite' }} /></td>
                   <td style={{ padding: '13px 16px' }}><span style={{ display: 'block', height: 13, width: `${140 + (i % 3) * 60}px`, borderRadius: 6, background: 'var(--ink10)', animation: 'shimmer 1.4s ease-in-out infinite' }} /></td>
+                  <td style={{ padding: '13px 16px' }}><span style={{ display: 'block', height: 13, width: 60, borderRadius: 6, background: 'var(--ink10)', animation: 'shimmer 1.4s ease-in-out infinite' }} /></td>
                   <td style={{ padding: '13px 16px' }}><span style={{ display: 'block', height: 22, width: 72, borderRadius: 999, background: 'var(--ink10)', animation: 'shimmer 1.4s ease-in-out infinite' }} /></td>
                   <td style={{ padding: '13px 16px' }}><span style={{ display: 'block', height: 13, width: 56, borderRadius: 6, background: 'var(--ink10)', animation: 'shimmer 1.4s ease-in-out infinite' }} /></td>
                   <td style={{ padding: '13px 16px' }}><span style={{ display: 'block', width: 26, height: 26, borderRadius: '50%', background: 'var(--ink10)', animation: 'shimmer 1.4s ease-in-out infinite' }} /></td>
@@ -182,7 +184,7 @@ export function Dashboard() {
           <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['Experience', 'Status', 'Updated', 'Assigned'].map(h => (
+                {['Supplier', 'Experience', 'City', 'Status', 'Updated', 'Assigned'].map(h => (
                   <th key={h} style={{
                     padding: '11px 16px', textAlign: 'left', fontSize: 11,
                     fontWeight: 600, color: 'var(--ink60)', letterSpacing: '0.06em',
@@ -204,7 +206,9 @@ export function Dashboard() {
                     onMouseEnter={e => (e.currentTarget.style.background = '#FAFAFA')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
+                    <td style={{ padding: '13px 16px', fontSize: 13, color: 'var(--ink60)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={l.supplier}>{l.supplier}</td>
                     <td style={{ padding: '13px 16px', fontSize: 13, fontWeight: 500, maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={l.experience}>{l.experience}</td>
+                    <td style={{ padding: '13px 16px', fontSize: 13, color: 'var(--ink60)' }}>{l.city}</td>
                     <td style={{ padding: '13px 16px' }}>
                       <span style={{
                         display: 'inline-flex', alignItems: 'center', gap: 4,
