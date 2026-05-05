@@ -286,9 +286,9 @@ export function ReviewScreen() {
       }}>
         <button onClick={onBack} style={{
           background: 'none', border: 'none', color: 'var(--purps)', cursor: 'pointer',
-          fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px', borderRadius: 6,
+          fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4, padding: '2px 4px', borderRadius: 6,
         }}>
-          <ChevronLeft size={14} color="var(--purps)" /> Listings
+          <ChevronLeft size={13} color="var(--purps)" /> Listings
         </button>
         {supplierName && (<><ChevronRight size={13} color="var(--ink60)" />
         <span style={{ fontSize: 13, color: 'var(--ink60)' }}>{supplierName}</span></>)}
