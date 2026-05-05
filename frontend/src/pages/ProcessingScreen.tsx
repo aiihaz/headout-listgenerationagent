@@ -182,6 +182,23 @@ export function ProcessingScreen() {
           <span style={{ fontSize: 12, color: 'var(--purps)', fontWeight: 600 }}>{pct}%</span>
         </div>
 
+        <div style={{
+          marginTop: 20,
+          padding: '12px 14px',
+          background: '#fffbeb',
+          border: '1px solid #fcd34d',
+          borderRadius: 10,
+          display: 'flex',
+          gap: 10,
+          alignItems: 'flex-start',
+        }}>
+          <AlertTriangle size={15} color="#d97706" style={{ flexShrink: 0, marginTop: 1 }} />
+          <p style={{ fontSize: 12, color: '#92400e', margin: 0, lineHeight: 1.5 }}>
+            <strong style={{ fontWeight: 600 }}>Output quality is actively improving.</strong>{' '}
+            The AI pipeline is currently undergoing evaluation and refinement. You may notice some inconsistencies in this period — accuracy and consistency are expected to improve significantly as updates roll out.
+          </p>
+        </div>
+
         {stage >= STAGES.length && (
           <button
             onClick={() => onDoneRef.current()}

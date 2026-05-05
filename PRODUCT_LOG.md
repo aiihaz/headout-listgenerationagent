@@ -1,7 +1,7 @@
 # Headout AI Listing Generation Pipeline — Product Log
 
 > **Working directory**: `/Users/ihaz/Projects/list generation agent/`
-> **Last updated**: 2026-05-05 (Session 22)
+> **Last updated**: 2026-05-05 (Session 23)
 > **Status**: CLI pipeline complete and **verified end-to-end with OpenAI**. Frontend complete (all 6 screens, wired to real API, **deployed to Vercel**). Backend complete (Phases 1–2), **deployed to Render**. Full production stack live. URL routing overhauled (react-router-dom, `/listings/:id/` scheme, Vercel SPA rewrite). TopNav logout dropdown added. **Frontend: https://headout-listing-agent.vercel.app | Backend: https://headout-listgenerationagent.onrender.com**
 > **Repo**: https://github.com/aiihaz/headout-listgenerationagent (default branch: `staging`)
 
@@ -512,6 +512,14 @@ All 6 screens built, verified in browser, production build passing. See "Fronten
 ---
 
 ## Session History
+
+### Session 23 — Processing screen: eval-period quality warning (2026-05-05)
+
+Added an amber warning banner to the Processing screen (the loader state shown before the Review screen) to set expectation that AI output quality is actively improving. The banner renders below the progress bar and reads: *"Output quality is actively improving. The AI pipeline is currently undergoing evaluation and refinement. You may notice some inconsistencies in this period — accuracy and consistency are expected to improve significantly as updates roll out."*
+
+**Change**: `frontend/src/pages/ProcessingScreen.tsx` — amber info box injected below the progress/context-line row, always visible during processing. Uses `AlertTriangle` (already imported), `#fffbeb` background, `#fcd34d` border, amber text palette. No new dependencies.
+
+---
 
 ### Session 22 — Flag persistence across navigation + warnings trigger regen (2026-05-05)
 
