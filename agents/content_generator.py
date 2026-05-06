@@ -116,14 +116,19 @@ def _merge_regen(previous: ListingOutput, regen_raw: dict, scope: list[str]) -> 
     return ListingOutput.model_validate(base)
 
 
-# Fields the prompt explicitly says are not stop conditions — model non-compliance retried
-_NON_STOP_FIELDS = frozenset(["variants[0].pricing"])
-
 _NON_STOP_RETRY_MSG = (
     "\n\nCORRECTION: Missing pricing is NOT a stop condition. "
     "Generate the full listing and add \"pricing_missing\" to publish_verdict.warnings[]. "
     "Do NOT return an error object for missing pricing."
 )
+
+
+def _is_pricing_only_stop(raw: dict) -> bool:
+    reason = (raw.get("reason") or "").lower()
+    missing = [str(f).lower() for f in (raw.get("missing") or [])]
+    pricing_in_reason = "pricing" in reason
+    pricing_in_missing = all("pricing" in f for f in missing) if missing else False
+    return pricing_in_reason or pricing_in_missing
 
 
 def _check_hard_stop(raw: dict) -> None:
@@ -150,11 +155,9 @@ def _call_with_retry(user_content: str, client: OpenAI, temperature: float) -> d
             continue
 
         # Model returned error: true for a non-stop condition — retry with explicit correction
-        if raw.get("error") is True and attempt == 0:
-            missing = set(raw.get("missing") or [])
-            if missing and missing.issubset(_NON_STOP_FIELDS):
-                user_content += _NON_STOP_RETRY_MSG
-                continue
+        if raw.get("error") is True and attempt == 0 and _is_pricing_only_stop(raw):
+            user_content += _NON_STOP_RETRY_MSG
+            continue
 
         return raw
     return {}
