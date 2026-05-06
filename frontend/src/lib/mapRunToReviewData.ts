@@ -384,14 +384,23 @@ export function mapRunToReviewData(
       source: makeSource(sources, flagMap, 'cancellationPolicy'),
       action: cancelIncomplete ? 'associate_action' : fieldAction('cancellationPolicy', blockers),
     },
+    seoTitle: {
+      id: 'seo-title',
+      label: 'SEO meta title',
+      value: (seoObj?.title as string) ?? '',
+      status: fieldStatus('listing.seo.title', blockers, warnings),
+      reason: fixReason('listing.seo.title', blockers, warnings),
+      source: null,
+      action: fieldAction('listing.seo.title', blockers),
+    },
     seoNote: {
       id: 'seo',
       label: 'SEO tags',
-      value: tags.join(', ') || (seoObj?.metaDescription as string) || '',
-      status: fieldStatus('listing.seo', blockers, warnings),
-      reason: fixReason('listing.seo', blockers, warnings),
+      value: tags.join(', ') || '',
+      status: fieldStatus('listing.seo.tags', blockers, warnings),
+      reason: fixReason('listing.seo.tags', blockers, warnings),
       source: null,
-      action: fieldAction('listing.seo', blockers),
+      action: fieldAction('listing.seo.tags', blockers),
     },
   };
 }

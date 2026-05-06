@@ -176,5 +176,6 @@ export interface ReviewData {
   pricing: PricingVariant[];
   variantsCopy: VariantCopy[];
   cancellation: FieldData;
+  seoTitle: FieldData;
   seoNote: FieldData;
 }

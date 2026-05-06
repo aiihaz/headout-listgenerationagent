@@ -144,7 +144,7 @@ export function FieldComponent({ field, showSource = true, onResolve, onRegenera
           </div>
         )}
 
-        {/* Edit action */}
+        {/* Edit action — hidden for flagged items (use "Update manually" in the flag section) */}
         {editing ? (
           <div style={{ display: 'flex', gap: 6 }}>
             <button onClick={handleCancel} style={{
@@ -163,7 +163,7 @@ export function FieldComponent({ field, showSource = true, onResolve, onRegenera
               <Check size={12} /> Save
             </button>
           </div>
-        ) : (
+        ) : status !== 'flag' && (
           <div style={{ display: 'flex', gap: 6 }}>
             <button onClick={() => { setEditStartVal(val); setEditStartTab(activeTab); setEditing(true); }} style={{
               display: 'flex', alignItems: 'center', gap: 4, height: 26, padding: '0 10px',

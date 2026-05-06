@@ -8,6 +8,7 @@ Artifacts saved per run to listings/{run_id}/:
 """
 
 import json
+import re
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -189,41 +190,36 @@ def run(
         _save_final(run_dir, ctx)
         return _result(ctx)
 
-    # FAIL / conditional_pass path — split blockers by action_required; include all warnings in regen
+    # FAIL / conditional_pass path — attempt regen for ALL blockers and all content warnings.
+    # Both "regenerate" and "associate_action" blockers are passed; the content generator
+    # receives the fix_instruction for each. If the AI cannot fix a field (e.g. missing supplier
+    # data), the 2nd review will flag it again and it surfaces to the reviewer correctly.
     all_blockers = ctx.review.review.blockers
     all_warnings = ctx.review.review.warnings
-    regen_blockers = [b for b in all_blockers if b.action_required == "regenerate"]
-    associate_blockers = [b for b in all_blockers if b.action_required == "associate_action"]
 
-    # If only associate-action blockers remain and no warnings, surface to review without regen
-    if not regen_blockers and not all_warnings:
-        ctx.state = PipelineState.READY_FOR_PUBLISH
-        ctx.finished_at = datetime.now(timezone.utc).isoformat()
-        _notify(ctx.state, status_callback, flag_count=len(associate_blockers))
-        _save_final(run_dir, ctx)
-        return _result(ctx)
-
-    # Attempt regen for both regenerate-type blockers and all warnings.
-    # escalate_to_human on a first pass reflects Review Agent uncertainty, not a blocker the regen
-    # can't fix. The second pass will escalate if regen didn't resolve the issues.
-    ctx.state = PipelineState.REGENERATION_IN_PROGRESS
-    _notify(ctx.state, status_callback)
-    # Exclude _meta.* warnings — those are supplier-level constraints, not regeneratable content
+    # Exclude _meta.* warnings — supplier-level constraints, not regeneratable content
     content_warnings = [w for w in all_warnings if not w.field.startswith("_meta.")]
     warning_fix_items = [
         {"field": w.field, "found": w.issue, "intake_says": "n/a", "fix_instruction": w.suggestion}
         for w in content_warnings
     ]
-    blockers = [b.model_dump() for b in regen_blockers] + warning_fix_items
-    scope = [b.field for b in regen_blockers] + [w.field for w in content_warnings]
+    blockers = [b.model_dump() for b in all_blockers] + warning_fix_items
+    # Normalise paths: strip array indices so _merge_regen can replace the whole section.
+    # e.g. "listing.highlights[0]" → "listing.highlights" (deduplicated)
+    scope = list(dict.fromkeys(
+        re.sub(r'\[\d+\]', '', b["field"]) for b in blockers
+    ))
 
-    # If nothing is actually regeneratable (only _meta warnings and associate blockers), surface as-is
+    # Nothing to regenerate (e.g. conditional_pass with only _meta warnings)
     if not blockers:
         ctx.state = PipelineState.READY_FOR_PUBLISH
         ctx.finished_at = datetime.now(timezone.utc).isoformat()
-        _notify(ctx.state, status_callback, flag_count=len(associate_blockers))
+        _notify(ctx.state, status_callback, flag_count=0)
         _save_final(run_dir, ctx)
         return _result(ctx)
+
+    ctx.state = PipelineState.REGENERATION_IN_PROGRESS
+    _notify(ctx.state, status_callback)
 
     try:
         regen_listing = content_generator.run_targeted_regen(

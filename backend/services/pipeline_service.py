@@ -12,6 +12,7 @@ import asyncio
 import json
 import os
 import queue
+import re
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Optional
@@ -213,7 +214,8 @@ def _sync_regeneration(
             except Exception:
                 pass
 
-        scope = [section]
+        # Normalise scope: strip bracket indices so _merge_regen replaces the whole section
+        scope = [re.sub(r'\[\d+\]', '', section)]
         blockers = [
             {
                 "field": section,

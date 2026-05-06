@@ -22,6 +22,7 @@ const EMPTY_REVIEW_DATA: ReviewData = {
   pricing: [],
   variantsCopy: [],
   cancellation: { id: 'cancel', label: 'Cancellation policy', value: '', status: 'ready', source: null },
+  seoTitle: { id: 'seo-title', label: 'SEO meta title', value: '', status: 'ready', source: null },
   seoNote: { id: 'seo', label: 'SEO tags', value: '', status: 'ready', source: null },
 };
 
@@ -65,6 +66,7 @@ function buildFlagList(data: ReviewData) {
     if (v.upsellHook) push(v.upsellHook, 's-variants');
   });
   push(data.cancellation, 's-cancel');
+  push(data.seoTitle, 's-seo');
   push(data.seoNote, 's-seo');
   return list;
 }
@@ -106,7 +108,7 @@ function countFlags(data: ReviewData): number {
     data.title, data.tagline, data.descHook,
     ...data.highlights, ...data.inclusions, ...data.exclusions,
     ...kbygFields, ...data.faqs, ...variantFields,
-    data.cancellation, data.seoNote,
+    data.cancellation, data.seoTitle, data.seoNote,
   ];
   const fieldFlags = allFields.filter(f => f.status === 'flag').length;
   return fieldFlags + (pricingStatus(data.pricing) === 'flag' ? 1 : 0);
@@ -303,7 +305,7 @@ export function ReviewScreen() {
     { id: 's-faqs', label: 'FAQs', status: resolvedOrActual('s-faqs', reviewData.faqs.find(f => f.status !== 'ready')?.status ?? 'ready', 2) },
     { id: 's-pricing', label: 'Pricing', status: resolvedOrActual('s-pricing', pricingStatus(reviewData.pricing)) },
     { id: 's-variants', label: 'Variants', status: resolvedOrActual('s-variants', variantsCopyStatus()) },
-    { id: 's-seo', label: 'SEO tags', status: resolvedOrActual('s-seo', reviewData.seoNote.status) },
+    { id: 's-seo', label: 'SEO', status: resolvedOrActual('s-seo', reviewData.seoTitle.status === 'flag' || reviewData.seoNote.status === 'flag' ? 'flag' : 'ready') },
     { id: 's-cancel', label: 'Cancellation', status: resolvedOrActual('s-cancel', reviewData.cancellation.status) },
   ];
 
@@ -609,7 +611,7 @@ export function ReviewScreen() {
             <FieldComponent key={h.id} field={h} showSource={showSourceQuotes}
               initialResolved={isPublished || resolvedFieldIds.has(h.id ?? '')}
               onResolve={h.status !== 'ready' ? () => markFieldResolved(h.id ?? '', 's-highlights') : undefined}
-              onRegenerate={makeRegenerator('highlights', h.reason)} />
+              onRegenerate={makeRegenerator('listing.highlights', h.reason)} />
           ))}
         </Section>
 
@@ -618,7 +620,7 @@ export function ReviewScreen() {
             <FieldComponent key={h.id} field={h} showSource={showSourceQuotes}
               initialResolved={isPublished || resolvedFieldIds.has(h.id ?? '')}
               onResolve={h.status !== 'ready' ? () => markFieldResolved(h.id ?? '', 's-inclusions') : undefined}
-              onRegenerate={makeRegenerator('inclusions', h.reason)} />
+              onRegenerate={makeRegenerator('listing.inclusions', h.reason)} />
           ))}
         </Section>
 
@@ -627,7 +629,7 @@ export function ReviewScreen() {
             <FieldComponent key={h.id} field={h} showSource={showSourceQuotes}
               initialResolved={isPublished || resolvedFieldIds.has(h.id ?? '')}
               onResolve={h.status !== 'ready' ? () => markFieldResolved(h.id ?? '', 's-exclusions') : undefined}
-              onRegenerate={makeRegenerator('exclusions', h.reason)} />
+              onRegenerate={makeRegenerator('listing.exclusions', h.reason)} />
           ))}
         </Section>
 
@@ -663,7 +665,7 @@ export function ReviewScreen() {
             <FieldComponent key={f.id} field={f} showSource={showSourceQuotes}
               initialResolved={isPublished || resolvedFieldIds.has(f.id ?? '')}
               onResolve={f.status !== 'ready' ? () => markFieldResolved(f.id ?? '', 's-faqs') : undefined}
-              onRegenerate={makeRegenerator('faqs', f.reason)} />
+              onRegenerate={makeRegenerator('listing.faqs', f.reason)} />
           ))}
         </Section>
 
@@ -704,10 +706,16 @@ export function ReviewScreen() {
         </Section>
 
         <Section id="s-seo">
+          {reviewData.seoTitle.value && (
+            <FieldComponent field={reviewData.seoTitle} showSource={showSourceQuotes}
+              initialResolved={isPublished || resolvedFieldIds.has('seo-title')}
+              onResolve={() => markFieldResolved('seo-title', 's-seo')}
+              onRegenerate={makeRegenerator('listing.seo.title', reviewData.seoTitle.reason)} />
+          )}
           <FieldComponent field={reviewData.seoNote} showSource={showSourceQuotes}
             initialResolved={isPublished || resolvedFieldIds.has('seo')}
             onResolve={() => markFieldResolved('seo', 's-seo')}
-            onRegenerate={makeRegenerator('seo', reviewData.seoNote.reason)} />
+            onRegenerate={makeRegenerator('listing.seo.tags', reviewData.seoNote.reason)} />
         </Section>
 
         <Section id="s-cancel">
