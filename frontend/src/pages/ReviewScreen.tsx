@@ -224,22 +224,37 @@ export function ReviewScreen() {
     }).catch(() => {}).finally(() => setLoadingRun(false));
   };
 
+  // Refresh data after a targeted regen — preserves resolved state so other fields don't reset
+  const softReloadData = async () => {
+    if (!runId) return;
+    const run = await api.getRun(runId);
+    if (run.supplier_name) setSupplierName(run.supplier_name);
+    const merged = run.artifacts?.merged_listing as Record<string, unknown> | undefined;
+    if (merged) {
+      const reviewArtifact = run.artifacts?.review as Record<string, unknown> | undefined;
+      const intakeArtifact = run.artifacts?.intake as Record<string, unknown> | undefined;
+      const data = mapRunToReviewData({ ...merged, review: reviewArtifact?.review }, intakeArtifact);
+      setReviewData(data);
+      setTotalFlags(buildFlagList(data).length);
+    }
+  };
+
   const makeRegenerator = (sectionId: string, fixInstruction?: string) => {
     if (!runId) return undefined;
-    return async () => {
-      await api.regenerateSection(runId, sectionId, fixInstruction ?? '');
-      // Poll for completion — regeneration is async on the backend
-      const pollInterval = setInterval(() => {
-        api.getRunStatus(runId).then(status => {
-          if (status.status === 'ready_for_publish' || status.status === 'escalated_to_human') {
-            clearInterval(pollInterval);
-            reloadRun();
-          }
-        }).catch(() => clearInterval(pollInterval));
-      }, 2000);
-      // Safety: stop polling after 3 minutes
-      setTimeout(() => clearInterval(pollInterval), 180_000);
-    };
+    return () => new Promise<void>((resolve, reject) => {
+      api.regenerateSection(runId, sectionId, fixInstruction ?? '').then(() => {
+        const pollInterval = setInterval(() => {
+          api.getRunStatus(runId).then(status => {
+            if (status.status === 'ready_for_publish' || status.status === 'escalated_to_human') {
+              clearInterval(pollInterval);
+              softReloadData().then(resolve).catch(reject);
+            }
+          }).catch(err => { clearInterval(pollInterval); reject(err); });
+        }, 2000);
+        // Safety: resolve after 3 minutes even if poll never fires
+        setTimeout(() => { clearInterval(pollInterval); resolve(); }, 180_000);
+      }).catch(reject);
+    });
   };
 
   function resolvedOrActual(sectionId: string, actual: FieldStatus, resolveThreshold = 1): FieldStatus {

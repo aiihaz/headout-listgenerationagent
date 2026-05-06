@@ -402,6 +402,10 @@ The `know_before_you_go` section is practical, not marketing. Source every item 
 
 Mix: 2-3 head terms + 3-4 mid-tail + 2-3 long-tail. All lowercase. No spaces in multi-word tags — use hyphens.
 
+- **Head terms**: 1-2 words, broad (e.g. `desert-safari`, `barcelona-tickets`)
+- **Mid-tail**: 2 words, activity + context (e.g. `skip-the-line-barcelona`, `dubai-desert-experience`)
+- **Long-tail**: 3+ words, specific combination of activity + modifier + location (e.g. `evening-desert-safari-dubai`, `skip-the-line-sagrada-familia-tickets`, `private-camel-ride-dune-bashing`). A tag is NOT long-tail unless it has 3 or more hyphen-separated words.
+
 ```
 ["sagrada-familia-tickets", "barcelona-attractions", "skip-the-line-barcelona",
  "gaudi-architecture", "tower-access-sagrada-familia", "fast-track-tickets-barcelona",
@@ -500,6 +504,7 @@ Your user message may contain an "SEO Research Context" section with data from G
 - Use the structural pattern of top competitor titles (what type of modifier, how they position the experience) as inspiration for `title.ab_variant`
 - Do NOT copy any title verbatim or near-verbatim
 - The A/B variant must still be in the Headout voice
+- **Never extract any numeric values from competitor titles** — prices (e.g. "From $42"), durations, distances, or counts you see here are competitor data, not intake data. Do not use any number from this section in listing copy. All numbers in copy must come exclusively from the intake JSON payload.
 
 **Related Searches → tag candidates**
 - Use relevant related searches as candidates to supplement `seo.tags[]`

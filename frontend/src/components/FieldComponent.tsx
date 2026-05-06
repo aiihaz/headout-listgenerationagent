@@ -219,7 +219,18 @@ export function FieldComponent({ field, showSource = true, onResolve, onRegenera
 
       {/* Content */}
       <div style={{ padding: '12px 14px', position: 'relative' }}>
-        {editing ? (
+        {regenerating ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 4, paddingBottom: 4 }}>
+            {[1, 0.75, 0.5].map((w, i) => (
+              <div key={i} style={{
+                height: 14, borderRadius: 6, background: 'var(--ink10, #F1F1F1)',
+                width: `${w * 100}%`,
+                animation: 'skeleton-pulse 1.4s ease-in-out infinite',
+                animationDelay: `${i * 0.15}s`,
+              }} />
+            ))}
+          </div>
+        ) : editing ? (
           <textarea
             ref={textareaRef}
             value={val}
