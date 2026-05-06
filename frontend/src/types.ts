@@ -147,14 +147,34 @@ export interface PricingVariant {
   tiers: PricingTier[];
 }
 
+export interface KnowBeforeYouGoSection {
+  whatToBring: FieldData[];
+  whatsNotAllowed: FieldData[];
+  accessibility: FieldData;
+  additional: FieldData[];
+}
+
+export interface VariantCopy {
+  index: number;
+  name: string;
+  nameAbVariant: string;
+  tagline: FieldData;
+  description: FieldData;
+  keyDifferentiators: FieldData[];
+  upsellHook?: FieldData;
+}
+
 export interface ReviewData {
   title: FieldData;
+  tagline: FieldData;
   descHook: FieldData;
   highlights: FieldData[];
   inclusions: FieldData[];
   exclusions: FieldData[];
+  kbyg: KnowBeforeYouGoSection;
   faqs: FieldData[];
   pricing: PricingVariant[];
+  variantsCopy: VariantCopy[];
   cancellation: FieldData;
   seoNote: FieldData;
 }

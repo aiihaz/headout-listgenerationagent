@@ -1,8 +1,8 @@
 # Headout AI Listing Generation Pipeline — Product Log
 
 > **Working directory**: `/Users/ihaz/Projects/list generation agent/`
-> **Last updated**: 2026-05-05 (Session 24)
-> **Status**: CLI pipeline complete and **verified end-to-end with OpenAI**. Frontend complete (all 6 screens, wired to real API, **deployed to Vercel**). Backend complete (Phases 1–2), **deployed to Render**. Full production stack live. URL routing overhauled (react-router-dom, `/listings/:id/` scheme, Vercel SPA rewrite). TopNav logout dropdown added. **Frontend: https://headout-listing-agent.vercel.app | Backend: https://headout-listgenerationagent.onrender.com**
+> **Last updated**: 2026-05-06 (Session 26)
+> **Status**: CLI pipeline complete and **verified end-to-end with OpenAI**. Frontend complete (all 6 screens, wired to real API, **deployed to Vercel**). Backend complete (Phases 1–2), **deployed to Render**. Full production stack live. URL routing overhauled (react-router-dom, `/listings/:id/` scheme, Vercel SPA rewrite). TopNav logout dropdown added. **Session 26: full production audit — 12 gaps patched across pipeline correctness, data persistence, Review Screen coverage, and eval rubric.** **Frontend: https://headout-listing-agent.vercel.app | Backend: https://headout-listgenerationagent.onrender.com**
 > **Repo**: https://github.com/aiihaz/headout-listgenerationagent (default branch: `staging`)
 
 ---
@@ -89,7 +89,7 @@ python3 generate_listing.py --input examples/supplier_happy_path.txt --output my
 | File | Role | Status |
 |---|---|---|
 | `requirements.txt` | `openai`, pydantic, typer, rich, python-dotenv | Done |
-| `models/intake.py` | Pydantic models: IntakeResult, IntakeMeta, AmbiguityFlag, DesignDecision | Done |
+| `models/intake.py` | Pydantic models: IntakeResult, IntakeMeta, AmbiguityFlag, DesignDecision; `generated_at` and `prompt_version` made `Optional[str] = None` to accept null from v5 prompt | Done — updated 2026-05-06 |
 | `models/listing.py` | Pydantic models: ListingOutput, Listing, Variant, FAQ (+ `paa_source`), SEO, PublishVerdict; `_coerce_str_to_list` validator on all `list[str]` fields; `CopyQualityScore` fields and `copy_quality_score` made optional with defaults | Done — updated 2026-05-03 |
 | `models/review.py` | Pydantic models: ReviewOutput, ReviewDetail, ReviewBlocker, ReviewWarning; `action_required: Optional[str] = "regenerate"` added to `ReviewBlocker` | Done — updated 2026-05-04 |
 | `models/serper.py` | Pydantic models: SerperContext, SerperOrganic | Done — 2026-05-03 |
@@ -99,7 +99,7 @@ python3 generate_listing.py --input examples/supplier_happy_path.txt --output my
 | `agents/serper_agent.py` | LLM query gen (temp 0) + Serper API call + graceful degrade on all failure modes (blank key, timeout, 401, 429, bad JSON) | Done — 2026-05-03 |
 | `agents/content_generator.py` | OpenAI Responses API call + targeted regen logic; accepts `serper_context` and builds SEO Research Context section in user prompt | Done — updated 2026-05-03 |
 | `agents/template_engine.py` | Deterministic Python: intake payload → schema.org JSON-LD | Done |
-| `agents/review_agent.py` | OpenAI Responses API call, auto-escalates on second review pass; accepts `serper_context` and injects keyword signal / skip note | Done — updated 2026-05-03 |
+| `agents/review_agent.py` | OpenAI Responses API call, auto-escalates on second review pass; accepts `serper_context` and injects keyword signal / skip note; injects `review_pass_number: 2` into listing dict on regen pass (was text note — now JSON field prompt's Escalation Rule 4 requires) | Done — updated 2026-05-06 |
 | `agents/duplicate_detector.py` | difflib similarity check against `listings/` directory | Done |
 | `agents/email_generator.py` | Formats ambiguity_flags → supplier clarification email draft | Done |
 | `orchestrator.py` | 15-state pipeline machine, saves all artifacts per run; serper step between intake and generation; splits Review Agent blockers by `action_required` — only `regenerate` blockers trigger targeted regen, `associate_action` blockers surface to associate without regen round-trip; first-pass `escalate_to_human` no longer short-circuits regen — regen always runs when `regenerate` blockers exist | Done — updated 2026-05-04 |
@@ -122,16 +122,16 @@ Design source: `experience-onboarding-agent/` bundle (Headout design system — 
 | `frontend/public/logo.svg` | Headout logo | Done |
 | `frontend/public/fonts/` | Halyard Display + Halyard Text (.otf) | Done |
 | `frontend/src/index.css` | Headout design tokens: CSS custom properties, font faces, animations | Done |
-| `frontend/src/types.ts` | TypeScript types: FieldData, ListingRow, RunStatus (includes serper states), etc.; `FieldStatus: 'ready' \| 'flag'`; `VerdictType: 'ready' \| 'flag' \| null`; `escalated_to_human` in `TERMINAL_OK`; `created_by_email` added to `ApiRun` | Done — updated 2026-05-05 |
+| `frontend/src/types.ts` | TypeScript types: FieldData, ListingRow, RunStatus (includes serper states), etc.; `FieldStatus: 'ready' \| 'flag'`; `VerdictType: 'ready' \| 'flag' \| null`; `escalated_to_human` in `TERMINAL_OK`; `created_by_email` added to `ApiRun`; `KnowBeforeYouGoSection`, `VariantCopy` interfaces added; `ReviewData` expanded with `tagline`, `kbyg`, `variantsCopy` | Done — updated 2026-05-06 |
 | `frontend/src/main.tsx` | React root | Done |
 | `frontend/src/App.tsx` | Screen router (dashboard → upload → processing → review → publish → published) | Done |
 | `frontend/src/components/TopNav.tsx` | Nav bar: logo, "Listing Agent" label, autosave indicator, user avatar | Done |
 | `frontend/src/components/StatusPill.tsx` | Ready / Flagged / Processing pill with hover tooltip; single amber `flag` status replaces previous caveat/review/associate_action split | Done — updated 2026-05-05 |
 | `frontend/src/components/FieldComponent.tsx` | Core field: A/B/C tab switcher, inline edit, source quote popover, flag detail expander; two resolution actions only (Update manually / Raise with supplier); no regenerate button | Done — updated 2026-05-05 |
 | `frontend/src/pages/Dashboard.tsx` | Screen 1: listings table, status pills with flag counts, search, status filters; Assigned column now shows creator's initials derived from `created_by_email`, not the viewer's | Done — updated 2026-05-05 |
-| `frontend/src/pages/UploadScreen.tsx` | Screen 2: paste tab + file drag-and-drop + supplier autocomplete dropdown | Done |
+| `frontend/src/pages/UploadScreen.tsx` | Screen 2: paste tab + file drag-and-drop + supplier autocomplete dropdown; `canProcess` now requires content + supplier + experience name (all three) | Done — updated 2026-05-06 |
 | `frontend/src/pages/ProcessingScreen.tsx` | Screen 3: animated stage stepper (6 stages), live progress bar, context line; stage 2 updated to "Researching search landscape" covering serper states | Done — updated 2026-05-03 |
-| `frontend/src/pages/ReviewScreen.tsx` | Screen 4: horizontal section nav with status dots, verdict banner, supplier clarification modal, operating hours module | Done |
+| `frontend/src/pages/ReviewScreen.tsx` | Screen 4: horizontal section nav with status dots, verdict banner, supplier clarification modal, operating hours module; `s-tagline`, `s-kbyg`, `s-variants` sections added with full field rendering and regen wiring | Done — updated 2026-05-06 |
 | `frontend/src/pages/PublishConfirm.tsx` | Screen 5: listing summary card, checklist gate (Publish disabled until all checked) | Done |
 | `frontend/src/pages/PublishedScreen.tsx` | Screen 6: success state, "View on Headout" / "View in admin" links | Done |
 
@@ -148,7 +148,7 @@ Located at `backend/`. Run with `uvicorn backend.main:app --reload`. Requires no
 
 | File | Role | Status |
 |---|---|---|
-| `backend/services/pipeline_service.py` | ThreadPoolExecutor bridge: `launch_pipeline` and `launch_regeneration` run sync orchestrator in a thread; passes `SERPER_API_KEY` to orchestrator; loads `serper_context.json` for manual regen; `serper_context` added to artifact list. `save_image` persists uploads to Supabase Storage or filesystem. | Done — updated 2026-05-03 |
+| `backend/services/pipeline_service.py` | ThreadPoolExecutor bridge: `launch_pipeline` and `launch_regeneration` run sync orchestrator in a thread; passes `SERPER_API_KEY` to orchestrator; loads `serper_context.json` for manual regen; `serper_context` added to artifact list. `save_image` persists uploads to Supabase Storage or filesystem. `launch_regeneration` now calls `_persist_artifacts` (was missing — associate regens had no Supabase effect). `supplier_email_draft` added to artifact file map. `_update_experience_name_from_intake()` called post-pipeline to auto-populate `experience_name` from `intake.payload.productName`. | Done — updated 2026-05-06 |
 | `backend/tests/__init__.py` | Package marker | Done |
 | `backend/tests/test_pipeline_service.py` | 3 backend invariant tests (no Supabase, no OpenAI key required) — all passing | Done — 2026-05-03 |
 | `backend/tests/test_serper_agent.py` | 9 Serper agent tests: blank key skip, timeout skip, 401 skip, 429 skip, bad JSON skip, PAA parse, pipeline-continues-on-skip, output format unchanged when skipped, review prompt omits check 9 when skipped | Done — 2026-05-03 |
@@ -182,7 +182,7 @@ Located at `backend/`. Run with `uvicorn backend.main:app --reload`. Requires no
 | `backend/config.py` | `pydantic-settings`: `OPENAI_API_KEY`, OpenAI model overrides, `SERPER_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `ALLOWED_ORIGINS` | Done — updated 2026-05-03 |
 | `backend/dependencies.py` | `get_current_user`: Supabase JWT validation; dev passthrough when Supabase not configured | Done |
 | `backend/routers/runs.py` | `POST /api/v1/runs`, `GET /api/v1/runs/:id`, `PATCH /api/v1/runs/:id/fields` | Done |
-| `backend/services/supabase_service.py` | `supabase_write_with_retry()` — 3-attempt retry + filesystem fallback; `insert_run`, `update_run_status`, `write_artifact`, `get_run_with_artifacts`, `resolve_field` | Done |
+| `backend/services/supabase_service.py` | `supabase_write_with_retry()` — 3-attempt retry + filesystem fallback; `insert_run`, `update_run_status`, `write_artifact`, `get_run_with_artifacts`, `resolve_field` (now full read-merge-write with filesystem fallback; was a no-op); `update_experience_name()` added | Done — updated 2026-05-06 |
 | `supabase/migrations/001_initial_schema.sql` | `runs`, `run_artifacts`, `run_images`, `listings` tables + RLS on all 4 + `updated_at` trigger | Done |
 | `.github/workflows/keep-warm.yml` | Cron ping `/health` every 14 min — prevents Render free-tier cold starts | Done |
 | `tests/__init__.py` | Package marker | Done |
@@ -209,6 +209,8 @@ Located at `backend/`. Run with `uvicorn backend.main:app --reload`. Requires no
 | `listings/{run_id}/merged_listing_v2.json` | Post-regen listing (if regen was triggered) |
 | `listings/{run_id}/review_v2.json` | Second review verdict (if regen was triggered) |
 | `listings/{run_id}/escalation_record.json` | Escalation details (if pipeline escalated to human) |
+| `listings/{run_id}/supplier_email_draft.json` | Auto-drafted supplier clarification email (persisted to disk + synced to Supabase as `supplier_email_draft` artifact) |
+| `listings/{run_id}/field_resolutions.json` | Associate field-level resolutions (JSONB dict of `field_path → resolved_value`; merged on each resolve call) |
 
 ---
 
@@ -514,6 +516,97 @@ All 6 screens built, verified in browser, production build passing. See "Fronten
 ---
 
 ## Session History
+
+### Session 26 — Production audit: 12 pipeline gaps patched (2026-05-06)
+
+Full end-to-end audit of the production pipeline against all agents, API routes, artifact persistence, frontend field coverage, and the eval rubric. 12 categorised issues found and fixed.
+
+**C1 — `IntakeMeta.generated_at` null crash**
+
+`generated_at: str` rejected `null` from the v5 intake prompt, crashing the pipeline on production runs. Fixed to `Optional[str] = None` in `models/intake.py`.
+
+**C2 — `prompt_version` silently dropped by Pydantic**
+
+`prompt_version` was present in v5 prompt output but absent from `IntakeMeta`. Pydantic silently discarded it (extra fields policy). Added as `Optional[str] = None`.
+
+**H1 — `resolve_field` was a no-op**
+
+`backend/services/supabase_service.py`: `resolve_field` only checked run existence — it never wrote anything. Replaced with full read-merge-write: reads existing `field_resolutions` artifact from Supabase, merges the new `field_path → resolved_value`, upserts. Filesystem fallback (`listings/{run_id}/field_resolutions.json`) included for dev mode.
+
+**H2 — Associate regens never persisted to Supabase**
+
+`launch_regeneration` in `pipeline_service.py` was missing the `await _persist_artifacts(run_id)` call after the pipeline future completed. Associate-triggered regens silently had no Supabase effect — the run artifact stayed stale in the DB. Fixed: `_persist_artifacts` now called in both `launch_pipeline` and `launch_regeneration`.
+
+**H3 — Review Escalation Rule 4 unexercisable**
+
+The review prompt's Escalation Rule 4 fires when `listing.review_pass_number == 2`. The code was injecting a text note `regen_note` (ignored by the model) instead of a JSON field in the listing dict. Fixed: `listing_dict["review_pass_number"] = 2` injected when `is_regen=True` in `agents/review_agent.py`; `regen_note` removed.
+
+**M1 — `listing.tagline` never shown in Review Screen**
+
+The content generator writes a `tagline` field; the mapper had no mapping for it; the Review Screen had no section. Added full pipeline: mapper extracts tagline with flag status, `ReviewData.tagline: FieldData` type added, `s-tagline` section rendered between title and desc-hook with regen support.
+
+**M2 — `know_before_you_go` never shown in Review Screen**
+
+Four sub-fields (`whatToBring`, `whatsNotAllowed`, `accessibility`, `additional`) were mapped nowhere. Added `KnowBeforeYouGoSection` interface, mapper extracts all four sub-arrays from `mergedListing.knowBeforeYouGo`, `s-kbyg` section added after exclusions.
+
+**M3 — Variant copy never shown in Review Screen**
+
+Variant names, taglines, descriptions, key differentiators, and upsell hooks were generated but never surfaced to the associate. Added `VariantCopy` interface, mapper walks `mergedListing.variants`, `s-variants` section added after pricing with full copy field rendering per variant.
+
+**M4 — `experience_name` always blank in Dashboard**
+
+`runs.experience_name` was never populated post-pipeline. Added `_update_experience_name_from_intake()` async helper to `pipeline_service.py`; reads `intake.payload.productName` after `_persist_artifacts` completes and calls `supabase_service.update_experience_name(run_id, name)`. Dashboard now shows real experience names for all new runs.
+
+**M5 — Supplier email draft computed but never persisted**
+
+The orchestrator drafted a supplier clarification email but never wrote it to disk or to Supabase. Added `_save(run_dir / "supplier_email_draft.json", {"draft": ctx.supplier_email_draft})` in `orchestrator.py` immediately after generation. Added `"supplier_email_draft"` to `_ARTIFACT_FILES` in `pipeline_service.py` so it syncs to Supabase like every other artifact.
+
+**E1 — Eval rubric tested for 6 highlights; v5 prompt specifies 5**
+
+`eval/evaluate.py` `_score_content()` awarded 4 pts for `h_count == 6` and 2 pts for `h_count in (5, 7)`. The v5 content generator prompt specifies exactly 5 highlights. Fixed to: `h_count == 5` → 4 pts, `h_count in (4, 6)` → 2 pts.
+
+**L1 — UploadScreen allowed processing without supplier or exp name**
+
+`canProcess` gated only on content presence. `experience_name` was optional — associates could start a pipeline run without it, leaving `runs.experience_name` permanently blank. Fixed: `canProcess` now requires all three (content + `supplierID` + `expName`). Descriptive `title` tooltip on the Process button explains which prerequisite is missing.
+
+**TypeScript verification:** `npx tsc --noEmit` — 0 errors across all modified frontend files.
+
+**Files modified:**
+- `models/intake.py` — C1, C2
+- `agents/review_agent.py` — H3
+- `orchestrator.py` — M5
+- `backend/services/pipeline_service.py` — H2, M4, M5
+- `backend/services/supabase_service.py` — H1, M4
+- `frontend/src/types.ts` — M1, M2, M3
+- `frontend/src/lib/mapRunToReviewData.ts` — M1, M2, M3
+- `frontend/src/pages/ReviewScreen.tsx` — M1, M2, M3
+- `frontend/src/pages/UploadScreen.tsx` — L1
+- `eval/evaluate.py` — E1
+
+---
+
+### Session 25 — UI polish + supplier DB (2026-05-05)
+
+Five changes across the full stack:
+
+**Regenerate button order** (`frontend/src/components/FieldComponent.tsx`): Edit button now renders before Regenerate on all field cards — more natural left-to-right flow (read first, then fix).
+
+**Preview → headout.com** (`frontend/src/pages/ReviewScreen.tsx`): Clicking "Preview" in the breadcrumb bar now opens `https://www.headout.com` in a new tab (`window.open`).
+
+**Breadcrumb alignment fix** (`frontend/src/pages/ReviewScreen.tsx`): `ChevronLeft` was `size={14}` while `ChevronRight` was `size={13}`, and the back button had excess padding. Normalized to `size={13}` and padding `'2px 4px'` — the `< Listings` label and experience name now sit on the same baseline.
+
+**Dashboard supplier/city columns** (`frontend/src/pages/Dashboard.tsx`, `frontend/src/types.ts`): Added Supplier and City columns to the table. `rowFromApiRun` now maps `supplier_city` from the run row. Both the shimmer skeleton and the real data thead updated.
+
+**Supplier data persisted to Supabase** (full-stack):
+- Supabase migration `add_suppliers_table_and_run_supplier_fields`: created `public.suppliers` table (id, name, city) with RLS read-all policy; seeded with 10 entries matching the previously hardcoded frontend constant; added `supplier_name`, `supplier_city`, `supplier_id` columns to `public.runs`.
+- `backend/routers/runs.py`: `CreateRunRequest` accepts optional `supplier_name`, `supplier_city`, `supplier_id`; new `GET /api/v1/suppliers` endpoint reads from the `suppliers` table.
+- `backend/services/supabase_service.py`: `list_runs` select expanded to include new supplier columns.
+- `frontend/src/lib/api.ts`: `createRun` passes supplier fields; new `getSuppliers()` method.
+- `frontend/src/pages/UploadScreen.tsx`: removed hardcoded `SUPPLIERS` constant; fetches suppliers from DB on mount.
+
+City column in the dashboard now shows real data instead of `—` for all new runs created with a selected supplier.
+
+---
 
 ### Session 23 — Processing screen: eval-period quality warning (2026-05-05)
 

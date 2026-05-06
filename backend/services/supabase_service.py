@@ -166,18 +166,50 @@ async def list_runs(limit: int = 50) -> list[dict[str, Any]]:
 async def resolve_field(
     run_id: str, field_path: str, resolved_value: Any
 ) -> bool:
-    # Validates run exists; full field resolution wired in Phase 2
+    """Persist a single field resolution. Merges into an existing field_resolutions artifact."""
     client = _get_client()
     if client is None:
+        run_dir = LISTINGS_DIR / run_id
+        path = run_dir / "field_resolutions.json"
+        try:
+            existing = json.loads(path.read_text()) if path.exists() else {}
+        except Exception:
+            existing = {}
+        existing[field_path] = resolved_value
+        try:
+            path.write_text(json.dumps(existing, indent=2, ensure_ascii=False))
+        except Exception as exc:
+            logger.error("resolve_field filesystem write failed for %s: %s", run_id, exc)
+            return False
         return True
 
     try:
-        resp = (
-            client.table("runs").select("id").eq("id", run_id).single().execute()
-        )
-        return bool(resp.data)
-    except Exception:
+        existing: dict = {}
+        try:
+            resp = (
+                client.table("run_artifacts")
+                .select("payload")
+                .eq("run_id", run_id)
+                .eq("type", "field_resolutions")
+                .single()
+                .execute()
+            )
+            if resp.data:
+                existing = resp.data.get("payload") or {}
+        except Exception:
+            pass
+        existing[field_path] = resolved_value
+        await write_artifact(run_id, "field_resolutions", existing)
+        return True
+    except Exception as exc:
+        logger.error("resolve_field failed for %s/%s: %s", run_id, field_path, exc)
         return False
+
+
+async def update_experience_name(run_id: str, name: str) -> None:
+    await supabase_write_with_retry(
+        "runs", {"experience_name": name}, match={"id": run_id}, operation="update"
+    )
 
 
 def _filesystem_list_runs(limit: int) -> list[dict[str, Any]]:

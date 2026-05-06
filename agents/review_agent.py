@@ -39,7 +39,9 @@ def _build_prompt(
     is_regen: bool,
     serper_context: Optional[SerperContext] = None,
 ) -> str:
-    regen_note = "\n\n**NOTE: This is the second review pass. A targeted regeneration was already attempted.**\n" if is_regen else ""
+    listing_dict = listing.model_dump()
+    if is_regen:
+        listing_dict["review_pass_number"] = 2
     serper_section = ""
     if serper_context and not serper_context.skipped and serper_context.organic:
         primary_keyword = serper_context.organic[0].title
@@ -52,7 +54,7 @@ def _build_prompt(
 ---
 
 ## Content Generator Output
-{json.dumps(listing.model_dump(), indent=2)}{regen_note}{serper_section}"""
+{json.dumps(listing_dict, indent=2)}{serper_section}"""
 
 
 def _call_with_retry(user_content: str, client: OpenAI) -> dict:

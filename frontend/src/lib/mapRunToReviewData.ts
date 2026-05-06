@@ -1,4 +1,4 @@
-import type { FieldData, FieldSource, FieldStatus, ReviewBlocker, ReviewWarning, ReviewData, PricingTier, PricingVariant, PriceUnit } from '../types';
+import type { FieldData, FieldSource, FieldStatus, ReviewBlocker, ReviewWarning, ReviewData, PricingTier, PricingVariant, PriceUnit, KnowBeforeYouGoSection, VariantCopy } from '../types';
 
 /**
  * Returns true when a blocker/warning `field` path belongs to the UI card
@@ -248,6 +248,102 @@ export function mapRunToReviewData(
   const seoObj = listing.seo as Record<string, unknown> | undefined;
   const tags: string[] = (seoObj?.tags as string[]) ?? [];
 
+  // Tagline
+  const tagline: FieldData = {
+    id: 'tagline',
+    label: 'Tagline',
+    value: (listing.tagline as string) ?? '',
+    status: fieldStatus('listing.tagline', blockers, warnings),
+    reason: fixReason('listing.tagline', blockers, warnings),
+    source: null,
+    action: fieldAction('listing.tagline', blockers),
+  };
+
+  // Know Before You Go
+  const kbygRaw = (listing.know_before_you_go ?? {}) as Record<string, unknown>;
+  const kbyg: KnowBeforeYouGoSection = {
+    whatToBring: ((kbygRaw.what_to_bring as string[]) ?? []).map((item, i) => ({
+      id: `kbyg-bring${i}`,
+      label: `What to bring ${i + 1}`,
+      value: item,
+      status: fieldStatus(`listing.know_before_you_go.what_to_bring[${i}]`, blockers, warnings),
+      reason: fixReason(`listing.know_before_you_go.what_to_bring[${i}]`, blockers, warnings),
+      source: null,
+      action: fieldAction(`listing.know_before_you_go.what_to_bring[${i}]`, blockers),
+    } satisfies FieldData)),
+    whatsNotAllowed: ((kbygRaw.whats_not_allowed as string[]) ?? []).map((item, i) => ({
+      id: `kbyg-ban${i}`,
+      label: `Not allowed ${i + 1}`,
+      value: item,
+      status: fieldStatus(`listing.know_before_you_go.whats_not_allowed[${i}]`, blockers, warnings),
+      reason: fixReason(`listing.know_before_you_go.whats_not_allowed[${i}]`, blockers, warnings),
+      source: null,
+      action: fieldAction(`listing.know_before_you_go.whats_not_allowed[${i}]`, blockers),
+    } satisfies FieldData)),
+    accessibility: {
+      id: 'kbyg-access',
+      label: 'Accessibility',
+      value: (kbygRaw.accessibility as string) ?? '',
+      status: fieldStatus('listing.know_before_you_go.accessibility', blockers, warnings),
+      reason: fixReason('listing.know_before_you_go.accessibility', blockers, warnings),
+      source: null,
+      action: fieldAction('listing.know_before_you_go.accessibility', blockers),
+    },
+    additional: ((kbygRaw.additional as string[]) ?? []).map((item, i) => ({
+      id: `kbyg-add${i}`,
+      label: `Additional note ${i + 1}`,
+      value: item,
+      status: fieldStatus(`listing.know_before_you_go.additional[${i}]`, blockers, warnings),
+      reason: fixReason(`listing.know_before_you_go.additional[${i}]`, blockers, warnings),
+      source: null,
+      action: fieldAction(`listing.know_before_you_go.additional[${i}]`, blockers),
+    } satisfies FieldData)),
+  };
+
+  // Variant copy (name, tagline, description, key differentiators, upsell hook)
+  const rawVariantsCopy = (mergedListing.variants ?? []) as Record<string, unknown>[];
+  const variantsCopy: VariantCopy[] = rawVariantsCopy.map((v, i) => ({
+    index: i,
+    name: String(v.name ?? ''),
+    nameAbVariant: String(v.name_ab_variant ?? ''),
+    tagline: {
+      id: `var${i}-tagline`,
+      label: 'Tagline',
+      value: String(v.tagline ?? ''),
+      status: fieldStatus(`variants[${i}].tagline`, blockers, warnings),
+      reason: fixReason(`variants[${i}].tagline`, blockers, warnings),
+      source: null,
+      action: fieldAction(`variants[${i}].tagline`, blockers),
+    },
+    description: {
+      id: `var${i}-desc`,
+      label: 'Description',
+      value: String(v.description ?? ''),
+      status: fieldStatus(`variants[${i}].description`, blockers, warnings),
+      reason: fixReason(`variants[${i}].description`, blockers, warnings),
+      source: null,
+      action: fieldAction(`variants[${i}].description`, blockers),
+    },
+    keyDifferentiators: ((v.key_differentiators as string[]) ?? []).map((kd, j) => ({
+      id: `var${i}-kd${j}`,
+      label: `Differentiator ${j + 1}`,
+      value: kd,
+      status: fieldStatus(`variants[${i}].key_differentiators[${j}]`, blockers, warnings),
+      reason: fixReason(`variants[${i}].key_differentiators[${j}]`, blockers, warnings),
+      source: null,
+      action: fieldAction(`variants[${i}].key_differentiators[${j}]`, blockers),
+    } satisfies FieldData)),
+    upsellHook: v.upsell_hook ? {
+      id: `var${i}-upsell`,
+      label: 'Upsell hook',
+      value: String(v.upsell_hook),
+      status: fieldStatus(`variants[${i}].upsell_hook`, blockers, warnings),
+      reason: fixReason(`variants[${i}].upsell_hook`, blockers, warnings),
+      source: null,
+      action: fieldAction(`variants[${i}].upsell_hook`, blockers),
+    } : undefined,
+  }));
+
   return {
     title: {
       id: 'title',
@@ -259,6 +355,7 @@ export function mapRunToReviewData(
       source: makeSource(sources, flagMap, 'productName'),
       action: fieldAction('listing.title', blockers),
     },
+    tagline,
     descHook: {
       id: 'desc',
       label: 'Description hook',
@@ -272,8 +369,10 @@ export function mapRunToReviewData(
     highlights,
     inclusions,
     exclusions,
+    kbyg,
     faqs,
     pricing,
+    variantsCopy,
     cancellation: {
       id: 'cancel',
       label: 'Cancellation policy',

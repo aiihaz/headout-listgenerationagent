@@ -12,7 +12,7 @@ from models.serper import SerperContext
 _PROMPT_PATH = Path(__file__).parent.parent / "agent_prompt_content_generator.md"
 _SYSTEM_PROMPT = _PROMPT_PATH.read_text()
 
-TEMPERATURE = 0.7
+TEMPERATURE = 0.3
 TEMPERATURE_REGEN = 0.3
 
 

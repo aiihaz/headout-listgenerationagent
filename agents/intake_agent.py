@@ -30,5 +30,8 @@ def _call_with_retry(user_content: str, client: OpenAI, temperature: float) -> d
             user_content = (
                 user_content
                 + "\n\nIMPORTANT: Return valid JSON only. No markdown fences. No comments."
+                + " Your response must be under 8000 characters. If the experience is a COMBO_TICKET,"
+                + " keep variants flat and limit to the most purchasable combinations only."
+                + " Omit design_decisions[] and _sources{} entirely if needed to stay within the limit."
             )
     return {}

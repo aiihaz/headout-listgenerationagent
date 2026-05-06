@@ -88,6 +88,7 @@ _ARTIFACT_FILES = {
     "merged_listing": "merged_listing.json",
     "review": "review.json",
     "escalation_record": "escalation_record.json",
+    "supplier_email_draft": "supplier_email_draft.json",
 }
 
 
@@ -118,6 +119,22 @@ async def launch_pipeline(run_id: str, supplier_input: str) -> None:
     )
     await asyncio.gather(pipeline_future, _drain_status(run_id, status_q))
     await _persist_artifacts(run_id)
+    await _update_experience_name_from_intake(run_id)
+
+
+async def _update_experience_name_from_intake(run_id: str) -> None:
+    """Read productName from the intake artifact and update the run record."""
+    intake_path = LISTINGS_DIR / run_id / "intake.json"
+    if not intake_path.exists():
+        return
+    try:
+        intake_data = json.loads(intake_path.read_text())
+        product_name = intake_data.get("payload", {}).get("productName")
+        if product_name:
+            await supabase_service.update_experience_name(run_id, product_name)
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning("experience_name update failed for %s: %s", run_id, exc)
 
 
 # ---------------------------------------------------------------------------
@@ -220,6 +237,7 @@ async def launch_regeneration(
         _executor, _sync_regeneration, run_id, section, fix_instruction, status_q
     )
     await asyncio.gather(pipeline_future, _drain_status(run_id, status_q))
+    await _persist_artifacts(run_id)
 
 
 # ---------------------------------------------------------------------------

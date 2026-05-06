@@ -64,7 +64,8 @@ export function UploadScreen() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  const canProcess = files.length > 0 || pastedText.trim().length > 0;
+  const hasContent = files.length > 0 || pastedText.trim().length > 0;
+  const canProcess = hasContent && expName.trim().length > 0 && supplierID.length > 0;
 
   const addFiles = (raw: File[]) => {
     const valid = raw.filter(f =>
@@ -379,7 +380,15 @@ export function UploadScreen() {
               {submitError}
             </p>
           )}
-          <button onClick={handleProcess} disabled={!canProcess || submitting} style={{
+          <button
+            onClick={handleProcess}
+            disabled={!canProcess || submitting}
+            title={
+              !hasContent ? 'Add supplier data to continue' :
+              !supplierID ? 'Select a supplier to continue' :
+              !expName.trim() ? 'Enter an experience name to continue' : ''
+            }
+            style={{
             height: 44, padding: '0 28px',
             background: canProcess && !submitting ? 'var(--purps)' : 'var(--ink30)',
             color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600,

@@ -8,16 +8,19 @@ import { FieldComponent } from '../components/FieldComponent';
 import { PricingTable } from '../components/PricingTable';
 import { api } from '../lib/api';
 import { mapRunToReviewData } from '../lib/mapRunToReviewData';
-import type { FieldData, FieldStatus, ReviewData } from '../types';
+import type { FieldData, FieldStatus, ReviewData, VariantCopy } from '../types';
 
 const EMPTY_REVIEW_DATA: ReviewData = {
   title: { label: 'Title', value: '', status: 'ready', source: null },
+  tagline: { id: 'tagline', label: 'Tagline', value: '', status: 'ready', source: null },
   descHook: { label: 'Description hook', value: '', status: 'ready', source: null },
   highlights: [],
   inclusions: [],
   exclusions: [],
+  kbyg: { whatToBring: [], whatsNotAllowed: [], accessibility: { id: 'kbyg-access', label: 'Accessibility', value: '', status: 'ready', source: null }, additional: [] },
   faqs: [],
   pricing: [],
+  variantsCopy: [],
   cancellation: { id: 'cancel', label: 'Cancellation policy', value: '', status: 'ready', source: null },
   seoNote: { id: 'seo', label: 'SEO tags', value: '', status: 'ready', source: null },
 };
@@ -41,15 +44,26 @@ function buildFlagList(data: ReviewData) {
     }
   };
   push(data.title, 's-title');
+  push(data.tagline, 's-tagline');
   push(data.descHook, 's-desc');
   data.highlights.forEach(h => push(h, 's-highlights'));
   data.inclusions.forEach(i => push(i, 's-inclusions'));
   data.exclusions.forEach(e => push(e, 's-exclusions'));
+  data.kbyg.whatToBring.forEach(f => push(f, 's-kbyg'));
+  data.kbyg.whatsNotAllowed.forEach(f => push(f, 's-kbyg'));
+  push(data.kbyg.accessibility, 's-kbyg');
+  data.kbyg.additional.forEach(f => push(f, 's-kbyg'));
   data.faqs.forEach(f => push(f, 's-faqs'));
   const ps = pricingStatus(data.pricing);
   if (ps === 'flag') {
     list.push({ label: 'Pricing', reason: 'Pricing data is incomplete — confirm with supplier', id: 's-pricing' });
   }
+  data.variantsCopy.forEach(v => {
+    push(v.tagline, 's-variants');
+    push(v.description, 's-variants');
+    v.keyDifferentiators.forEach(kd => push(kd, 's-variants'));
+    if (v.upsellHook) push(v.upsellHook, 's-variants');
+  });
   push(data.cancellation, 's-cancel');
   push(data.seoNote, 's-seo');
   return list;
@@ -80,9 +94,19 @@ function SupplierMessageField(_: SupplierMessageFieldProps) {
 }
 
 function countFlags(data: ReviewData): number {
+  const kbygFields = [
+    ...data.kbyg.whatToBring, ...data.kbyg.whatsNotAllowed,
+    data.kbyg.accessibility, ...data.kbyg.additional,
+  ];
+  const variantFields = data.variantsCopy.flatMap(v => [
+    v.tagline, v.description, ...v.keyDifferentiators,
+    ...(v.upsellHook ? [v.upsellHook] : []),
+  ]);
   const allFields = [
-    data.title, data.descHook, ...data.highlights, ...data.inclusions,
-    ...data.exclusions, ...data.faqs, data.cancellation, data.seoNote,
+    data.title, data.tagline, data.descHook,
+    ...data.highlights, ...data.inclusions, ...data.exclusions,
+    ...kbygFields, ...data.faqs, ...variantFields,
+    data.cancellation, data.seoNote,
   ];
   const fieldFlags = allFields.filter(f => f.status === 'flag').length;
   return fieldFlags + (pricingStatus(data.pricing) === 'flag' ? 1 : 0);
@@ -102,7 +126,7 @@ export function ReviewScreen() {
   const [resolvedSections, setResolvedSections] = useState<Record<string, number>>({});
   const [resolvedFieldIds, setResolvedFieldIds] = useState<Set<string>>(new Set());
 
-  const ALL_SECTION_IDS = ['s-title', 's-desc', 's-highlights', 's-inclusions', 's-exclusions', 's-faqs', 's-pricing', 's-seo', 's-cancel'];
+  const ALL_SECTION_IDS = ['s-title', 's-tagline', 's-desc', 's-highlights', 's-inclusions', 's-exclusions', 's-kbyg', 's-faqs', 's-pricing', 's-variants', 's-seo', 's-cancel'];
 
   useEffect(() => {
     if (!runId) return;
@@ -222,14 +246,32 @@ export function ReviewScreen() {
     return resolvedSections[sectionId] >= resolveThreshold ? 'ready' : actual;
   }
 
+  const kbygFieldStatus = (): FieldStatus => {
+    const all = [
+      ...reviewData.kbyg.whatToBring, ...reviewData.kbyg.whatsNotAllowed,
+      reviewData.kbyg.accessibility, ...reviewData.kbyg.additional,
+    ];
+    return all.find(f => f.status !== 'ready')?.status ?? 'ready';
+  };
+  const variantsCopyStatus = (): FieldStatus => {
+    for (const v of reviewData.variantsCopy) {
+      const fields: FieldData[] = [v.tagline, v.description, ...v.keyDifferentiators, ...(v.upsellHook ? [v.upsellHook] : [])];
+      if (fields.some(f => f.status !== 'ready')) return 'flag';
+    }
+    return 'ready';
+  };
+
   const navSections = [
     { id: 's-title', label: 'Title', status: resolvedOrActual('s-title', reviewData.title.status) },
+    { id: 's-tagline', label: 'Tagline', status: resolvedOrActual('s-tagline', reviewData.tagline.status) },
     { id: 's-desc', label: 'Description', status: resolvedOrActual('s-desc', reviewData.descHook.status) },
     { id: 's-highlights', label: 'Highlights', status: resolvedOrActual('s-highlights', reviewData.highlights.find(h => h.status !== 'ready')?.status ?? 'ready') },
     { id: 's-inclusions', label: 'Inclusions', status: resolvedOrActual('s-inclusions', reviewData.inclusions.find(i => i.status !== 'ready')?.status ?? 'ready') },
     { id: 's-exclusions', label: 'Exclusions', status: resolvedOrActual('s-exclusions', reviewData.exclusions.find(e => e.status !== 'ready')?.status ?? 'ready') },
+    { id: 's-kbyg', label: 'Know Before You Go', status: resolvedOrActual('s-kbyg', kbygFieldStatus()) },
     { id: 's-faqs', label: 'FAQs', status: resolvedOrActual('s-faqs', reviewData.faqs.find(f => f.status !== 'ready')?.status ?? 'ready', 2) },
     { id: 's-pricing', label: 'Pricing', status: resolvedOrActual('s-pricing', pricingStatus(reviewData.pricing)) },
+    { id: 's-variants', label: 'Variants', status: resolvedOrActual('s-variants', variantsCopyStatus()) },
     { id: 's-seo', label: 'SEO tags', status: resolvedOrActual('s-seo', reviewData.seoNote.status) },
     { id: 's-cancel', label: 'Cancellation', status: resolvedOrActual('s-cancel', reviewData.cancellation.status) },
   ];
@@ -517,6 +559,13 @@ export function ReviewScreen() {
             onRegenerate={makeRegenerator('listing.title', reviewData.title.reason)} />
         </Section>
 
+        <Section id="s-tagline">
+          <FieldComponent field={reviewData.tagline} showSource={showSourceQuotes}
+            initialResolved={isPublished || resolvedFieldIds.has('tagline')}
+            onResolve={() => markFieldResolved('tagline', 's-tagline')}
+            onRegenerate={makeRegenerator('listing.tagline', reviewData.tagline.reason)} />
+        </Section>
+
         <Section id="s-desc">
           <FieldComponent field={reviewData.descHook} showSource={showSourceQuotes}
             initialResolved={isPublished || resolvedFieldIds.has('desc')}
@@ -551,6 +600,33 @@ export function ReviewScreen() {
           ))}
         </Section>
 
+        <Section id="s-kbyg">
+          {reviewData.kbyg.whatToBring.map(f => (
+            <FieldComponent key={f.id} field={f} showSource={showSourceQuotes}
+              initialResolved={isPublished || resolvedFieldIds.has(f.id ?? '')}
+              onResolve={f.status !== 'ready' ? () => markFieldResolved(f.id ?? '', 's-kbyg') : undefined}
+              onRegenerate={makeRegenerator('listing.know_before_you_go.what_to_bring', f.reason)} />
+          ))}
+          {reviewData.kbyg.whatsNotAllowed.map(f => (
+            <FieldComponent key={f.id} field={f} showSource={showSourceQuotes}
+              initialResolved={isPublished || resolvedFieldIds.has(f.id ?? '')}
+              onResolve={f.status !== 'ready' ? () => markFieldResolved(f.id ?? '', 's-kbyg') : undefined}
+              onRegenerate={makeRegenerator('listing.know_before_you_go.whats_not_allowed', f.reason)} />
+          ))}
+          {reviewData.kbyg.accessibility.value && (
+            <FieldComponent field={reviewData.kbyg.accessibility} showSource={showSourceQuotes}
+              initialResolved={isPublished || resolvedFieldIds.has('kbyg-access')}
+              onResolve={() => markFieldResolved('kbyg-access', 's-kbyg')}
+              onRegenerate={makeRegenerator('listing.know_before_you_go.accessibility', reviewData.kbyg.accessibility.reason)} />
+          )}
+          {reviewData.kbyg.additional.map(f => (
+            <FieldComponent key={f.id} field={f} showSource={showSourceQuotes}
+              initialResolved={isPublished || resolvedFieldIds.has(f.id ?? '')}
+              onResolve={f.status !== 'ready' ? () => markFieldResolved(f.id ?? '', 's-kbyg') : undefined}
+              onRegenerate={makeRegenerator('listing.know_before_you_go.additional', f.reason)} />
+          ))}
+        </Section>
+
         <Section id="s-faqs">
           {reviewData.faqs.map(f => (
             <FieldComponent key={f.id} field={f} showSource={showSourceQuotes}
@@ -564,6 +640,36 @@ export function ReviewScreen() {
           <PricingTable variants={reviewData.pricing}
             initialResolved={isPublished || resolvedSections['s-pricing'] >= 1}
             onResolve={() => markSectionResolved('s-pricing')} />
+        </Section>
+
+        <Section id="s-variants">
+          {reviewData.variantsCopy.map((v: VariantCopy) => (
+            <div key={v.index} style={{ marginBottom: v.index < reviewData.variantsCopy.length - 1 ? 16 : 0 }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink60)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
+                Variant {v.index + 1} — {v.name}
+              </p>
+              <FieldComponent field={v.tagline} showSource={showSourceQuotes}
+                initialResolved={isPublished || resolvedFieldIds.has(v.tagline.id ?? '')}
+                onResolve={v.tagline.status !== 'ready' ? () => markFieldResolved(v.tagline.id ?? '', 's-variants') : undefined}
+                onRegenerate={makeRegenerator(`variants[${v.index}].tagline`, v.tagline.reason)} />
+              <FieldComponent field={v.description} showSource={showSourceQuotes}
+                initialResolved={isPublished || resolvedFieldIds.has(v.description.id ?? '')}
+                onResolve={v.description.status !== 'ready' ? () => markFieldResolved(v.description.id ?? '', 's-variants') : undefined}
+                onRegenerate={makeRegenerator(`variants[${v.index}].description`, v.description.reason)} />
+              {v.keyDifferentiators.map(kd => (
+                <FieldComponent key={kd.id} field={kd} showSource={showSourceQuotes}
+                  initialResolved={isPublished || resolvedFieldIds.has(kd.id ?? '')}
+                  onResolve={kd.status !== 'ready' ? () => markFieldResolved(kd.id ?? '', 's-variants') : undefined}
+                  onRegenerate={makeRegenerator(`variants[${v.index}].key_differentiators`, kd.reason)} />
+              ))}
+              {v.upsellHook && (
+                <FieldComponent field={v.upsellHook} showSource={showSourceQuotes}
+                  initialResolved={isPublished || resolvedFieldIds.has(v.upsellHook.id ?? '')}
+                  onResolve={v.upsellHook.status !== 'ready' ? () => markFieldResolved(v.upsellHook!.id ?? '', 's-variants') : undefined}
+                  onRegenerate={makeRegenerator(`variants[${v.index}].upsell_hook`, v.upsellHook.reason)} />
+              )}
+            </div>
+          ))}
         </Section>
 
         <Section id="s-seo">

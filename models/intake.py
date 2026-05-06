@@ -25,10 +25,11 @@ class MetaConfidence(str, Enum):
 
 class IntakeMeta(BaseModel):
     supplier: str
-    generated_at: str
+    generated_at: Optional[str] = None
     confidence: MetaConfidence
     publish_blocked: bool
     publish_blocked_reasons: list[str] = Field(default_factory=list)
+    prompt_version: Optional[str] = None
 
 
 class AmbiguityFlag(BaseModel):

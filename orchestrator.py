@@ -127,6 +127,7 @@ def run(
     ctx.supplier_email_draft = email_generator.draft_clarification_email(
         ctx.intake.meta.supplier, ctx.intake.ambiguity_flags
     )
+    _save(run_dir / "supplier_email_draft.json", {"draft": ctx.supplier_email_draft})
 
     # Step 2.5 — Serper SEO research (graceful degrade: never blocks pipeline)
     ctx.state = PipelineState.SERPER_IN_PROGRESS
@@ -308,6 +309,18 @@ def _merge(listing: ListingOutput, json_ld: dict) -> ListingOutput:
 def _merged_to_dict(listing: ListingOutput, intake: IntakeResult) -> dict:
     d = listing.model_dump()
     d["intake_payload"] = intake.payload
+
+    # Bridge pricing from intake variants into listing variants.
+    # Content generator writes copy only — it has no pricing field.
+    # The merged output is what the frontend reads, so pricing must live here.
+    intake_variants = intake.payload.get("variants", [])
+    listing_variants = d.get("variants", [])
+    for i, lv in enumerate(listing_variants):
+        if i < len(intake_variants):
+            lv["pricing"] = intake_variants[i].get("pricing", [])
+            lv["duration"] = intake_variants[i].get("duration") or d.get("intake_payload", {}).get("duration")
+            lv["inventoryType"] = intake_variants[i].get("inventoryType")
+
     return d
 
 

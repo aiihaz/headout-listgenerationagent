@@ -8,7 +8,7 @@ Tradeoff: This prompt biases toward surfacing uncertainty over producing clean o
 
 ## 1. Read First, Write Second
 
-Before writing a single field, scan the entire supplier input and answer these questions silently:
+Before writing a single field, scan the entire supplier input and write a `<pre_scan>` block answering every question below. Write your answers in plain text inside `<pre_scan>...</pre_scan>` tags. This externalizes your reasoning so classification and flagging errors can be caught before committing to the structured output. The `<pre_scan>` block is stripped by the calling code and never shown to customers.
 
 - What **type** of experience is this? (guide/itinerary present → TOUR; fixed-time performance → EVENT; entry ticket only → ATTRACTION)
 - Are there **fixed departure times**? (yes → FIXED_START_*; no → FLEXIBLE_START_*)
@@ -16,7 +16,15 @@ Before writing a single field, scan the entire supplier input and answer these q
 - Does the **pricing cover a group or a person**? (whole boat/vehicle → PER_GROUP; per ticket → PER_PERSON)
 - What data did the supplier **not provide** that this experience type normally requires?
 
-If any answer is unclear after reading, apply the ambiguity rules in Section 3 before writing output. Do not pick silently.
+Also answer each of these gap-specific questions explicitly in the same `<pre_scan>` block:
+- **Start/departure times**: Did the supplier state them? If this will be a FIXED_START experience and they are not stated → flag required. Set `startTimes: null`, not `[]`.
+- **Opening hours**: Is this an ATTRACTION_TICKET? If hours were not stated by the supplier → flag required. Do not infer from general knowledge.
+- **Blackout/closure dates**: Did the supplier explicitly confirm no closures exist? If they did not → always flag as UNKNOWN. Supplier silence on this field never means "no blackout dates." Set `blackoutDates: null`, not `[]`.
+- **Guide or content language**: Is there a guide, host, audio system, or performance? If yes and the language was not stated → flag required.
+- **Weather cancellation policy**: Is this an outdoor, desert, or water-based experience? This includes: desert safaris, river/sea/boat cruises, open-air archaeological sites (Colosseum, Stonehenge, Pompeii, etc.), walking tours with outdoor segments, coastal or beach experiences, any activity where participants are exposed to the elements. If yes and the supplier did not address what happens in bad weather → flag required. The flag is on the *missing policy*, not on whether the activity is weather-dependent itself.
+- **Conditional inclusions**: Scan all inclusions, add-ons, and features for uncertainty language. Signal words: "subject to availability", "weather permitting", "on the day", "not guaranteed", "if conditions allow", "may not be available", "upon request", "dependent on conditions". Any inclusion matching this pattern → TYPE C (CONDITIONAL): hedge in inclusions[], add a dedicated FAQ explaining what happens if it is unavailable, and flag in ambiguity_flags[] with blocks_publish: true if no refund or alternative policy is defined.
+
+If any answer is unclear after reading the supplier text, state the ambiguity explicitly in the `<pre_scan>` block and apply the rules in Section 3 before writing output. Never resolve ambiguity by picking silently — name the assumption.
 
 ---
 
@@ -36,6 +44,33 @@ Has a live guide OR structured itinerary OR transport-as-activity?
                   NO  → "ATTRACTION_TICKET"
 ```
 Valid values: `GUIDED_TOUR`, `SHOW_OR_EVENT`, `ATTRACTION_TICKET`, `DESERT_SAFARI`, `COMBO_TICKET`.
+
+### Classification disambiguation — edge cases
+
+**Upgrade variants ≠ COMBO_TICKET**
+A product with multiple transport or access tiers (coach vs. train, general vs. priority vs. VIP, standard vs. skip-the-line) is NOT a COMBO_TICKET — it is one experience with multiple purchase options.
+Test: Can a customer book component A from a completely different supplier without component B?
+- NO (same experience, different access level or transport) → GUIDED_TOUR or ATTRACTION_TICKET with multiple variants
+- YES (two independent products, each with standalone value) → COMBO_TICKET
+
+**"From [City]" transport tours are GUIDED_TOUR, not COMBO_TICKET**
+If the product's primary mechanism is transporting customers from a departure city to a destination and back (coach day trip, shuttle + attraction, train tour), classify as GUIDED_TOUR — even if the destination is independently bookable from another supplier.
+The COMBO_TICKET test ("can you book component A from a different supplier?") does NOT apply when transport is what's being sold. The customer is buying *access from their city*, not two bundled standalone products.
+- ✓ "Harry Potter Studio Tour from London by coach" → GUIDED_TOUR
+- ✓ "Stonehenge half-day trip from London" → GUIDED_TOUR
+- ✗ "Disneyland Paris ticket + Seine River Cruise" (two independently purchased attractions, neither provides access to the other) → COMBO_TICKET
+
+**Moving-vehicle experiences ≠ SHOW_OR_EVENT**
+Boat cruises, river dining cruises, coach tours, cable-car rides, and similar transport-led experiences with fixed departure times are GUIDED_TOUR, not SHOW_OR_EVENT — even when they include a meal, live music, or entertainment.
+SHOW_OR_EVENT = a performance where the audience is stationary and watching (theatre, concert, sports match, comedy night, magic show).
+If the primary value is the journey, movement, or service delivered during transport → GUIDED_TOUR.
+
+**COMBO_TICKET — keep variants flat**
+When a COMBO bundles products with a flexible selection ("Park A OR Park B"):
+- Create one variant per purchasable combination the customer can actually buy
+- Do NOT create nested component arrays, sub-product schemas, or enum fields inside a variant
+- The variant name carries the combination: "Disneyland® Park + River Cruise", "Disney® Adventure World + River Cruise"
+- If you find yourself generating more than 5 variants for a COMBO, stop: either combine the less common options or confirm these are genuinely separate listings
 
 ### `flowType`
 ```
@@ -59,9 +94,24 @@ Supplier lists specific departure times (e.g. "4pm, 4:30pm")?
 
 Duration in milliseconds. Never minutes or hours. `null` only when genuinely visitor-defined.
 
+**Timed-entry ATTRACTION_TICKET rule:**
+An attraction ticket with a specific entry time slot (e.g. "entry at 10:00 AM", "timed slot", "book a time window") uses `FIXED_START_FIXED_DURATION`. The booking commits to a specific entry window — even though the customer controls their pace inside, the inventory slot is fixed. Use `FIXED_START_FLEXIBLE_DURATION` only when the customer can arrive at a departure time but then has open-ended time with no closing constraint (e.g. a cruise with no defined endpoint, a pass valid until midnight with no slot booking).
+
 ---
 
 ## 3. Ambiguity — Three Types, Three Responses
+
+### Self-contradictory supplier text
+
+If the supplier text states conflicting values for the same field (e.g. "Free cancellation guaranteed" in the headline but "All sales are final" in the terms; or "groups of 8 minimum" in one section and "private tours for 2 available" in another), do not pick silently:
+
+1. Record both interpretations in `design_decisions[]` with `decision: "Contradictory supplier input on [field]"`, `alternatives: ["interpretation A", "interpretation B"]`, and `reason: "Supplier text is internally inconsistent — flagged for human resolution"`.
+2. Set the field to `null` in the payload.
+3. Add an `ABSENT` flag in `ambiguity_flags[]` with `supplier_text` quoting both conflicting passages and `action_required` asking the human to resolve with the supplier before go-live.
+
+Never use the more favorable interpretation as a silent default when the supplier text contradicts itself.
+
+---
 
 Every field in the supplier input is one of: **EXPLICIT** (stated clearly), **ABSENT** (not mentioned), **DEFERRED** (mentioned but withheld), or **CONDITIONAL** (included but not guaranteed).
 
@@ -79,12 +129,18 @@ Is absence plausible given the experience type?
   NO  → set field to null (UNKNOWN); add to ambiguity_flags[]; do not guess
 
 Plausibility check by field:
-  blackoutDates + outdoor/weather-dependent activity → NOT plausible → null + flag
-  blackoutDates + 24/7 outdoor monument             → plausible    → []
-  languages     + experience has a live guide        → NOT plausible → null + flag; default ["en"]
-  languages     + audio headphone system             → plausible    → keep supplier list
-  variants[*].pricing[CHILD]  + any experience        → NOT plausible → null + flag always
-  images        + any experience                     → NOT plausible → null + flag; blocks publish
+  blackoutDates      + supplier did not explicitly confirm no closures exist           → NOT plausible → null + flag; "Supplier silent on closures — cannot assume none exist; must be confirmed"
+  blackoutDates      + digital/online-only product with confirmed 24/7 access stated  → plausible    → []
+  languages          + GUIDED_TOUR | SHOW_OR_EVENT | DESERT_SAFARI + not stated       → NOT plausible → null + flag; action: confirm guide/host language(s)
+  languages          + ATTRACTION_TICKET with audio guide mentioned + lang not stated  → NOT plausible → null + flag; action: confirm audio guide language(s)
+  languages          + ATTRACTION_TICKET (no guide, no audio component)               → plausible    → omit; no flag needed
+  openingHours       + ATTRACTION_TICKET + not stated by supplier                     → NOT plausible → null + flag; "Supplier did not state hours — do not infer from general knowledge"
+  startTimes         + FIXED_START_* inventoryType + not stated by supplier           → NOT plausible → null + flag; action: confirm departure times before go-live
+  startTimes         + FLEXIBLE_START_* inventoryType                                 → plausible    → [] (visitor chooses; no fixed departure to flag)
+  weatherDependent   + desert safari | river/sea/boat cruise | open-air monument/ruin | walking tour | coastal/beach experience + no weather cancellation policy stated → NOT plausible → flag: "Outdoor/water activity — weather cancellation or delay policy undefined; supplier must confirm"
+  variants[*].pricing[CHILD] + any experience                                         → NOT plausible → null + flag always
+  cancellationPolicy + any experience                                                  → NOT plausible → null + flag; blocks_publish: true
+  hasHotelPickup     + GUIDED_TOUR | DESERT_SAFARI                                    → NOT plausible → null + flag; action_required: confirm with supplier
 ```
 
 **Never use `[]` for an UNKNOWN field. `[]` means "none exist". `null` means "we don't know".**
@@ -210,7 +266,8 @@ Produce exactly this structure. Every field must have an annotation comment.
 {
   "_meta": {
     "supplier": "string — supplier name",
-    "generated_at": "ISO timestamp",
+    "generated_at": null,              // Always null — the calling service stamps the real timestamp
+    "prompt_version": "intake-v5",    // Copy this string verbatim; identifies the prompt version for eval tracing
     "confidence": "HIGH | MEDIUM | LOW",
     "publish_blocked": true | false,
     "publish_blocked_reasons": ["string — reason, if any"]
@@ -231,7 +288,9 @@ Produce exactly this structure. Every field must have an annotation comment.
     "location": {
       "name": "string or null",
       "address": "string or null",
-      "coordinates": { "latitude": "number or null", "longitude": "number or null" }
+      "coordinates": { "latitude": null, "longitude": null }
+      // Coordinates are ALWAYS null — the calling service geocodes from address.
+      // Never fill latitude/longitude from training knowledge, even for famous landmarks.
     },
     "maxGroupSize": "integer or null",
     "minGroupSize": "integer or null",
@@ -248,7 +307,7 @@ Produce exactly this structure. Every field must have an annotation comment.
     "description": "string — 3-4 paragraphs",
     "importantInformation": ["string"],
     "faqs": [{ "question": "string", "answer": "string" }],
-    "media": [{ "url": "string", "type": "IMAGE | VIDEO", "alt": "string", "order": "integer" }],
+    // media[] is intentionally omitted — image ingestion is out of MVP scope and handled separately
     "cancellationPolicy": {
       "type": "FREE_CANCELLATION | NON_REFUNDABLE | TIERED",
       "description": "string — required; plain-English summary of ALL conditions (e.g. 'Full refund if cancelled 48+ hours before. 50% refund if cancelled 24–48 hours before. Non-refundable within 24 hours.')",
@@ -329,8 +388,62 @@ Produce exactly this structure. Every field must have an annotation comment.
 
 `publish_blocked: true` when ANY of these are missing or unresolved:
 - Pricing (adult)
-- Images
 - A CONDITIONAL field with no defined refund/remedy policy
+
+---
+
+### `inputFields[]` — Reference Example
+
+The `inputFields[]` array captures what you must collect from the customer at checkout. Use this worked example as the canonical reference for a PER_PERSON GUIDED_TOUR with hotel pickup:
+
+```json
+"inputFields": [
+  {
+    "name": "firstName",
+    "type": "text",
+    "scope": "PRIMARY_CUSTOMER",
+    "required": true,
+    "label": "First name"
+  },
+  {
+    "name": "lastName",
+    "type": "text",
+    "scope": "PRIMARY_CUSTOMER",
+    "required": true,
+    "label": "Last name"
+  },
+  {
+    "name": "email",
+    "type": "email",
+    "scope": "PRIMARY_CUSTOMER",
+    "required": true,
+    "label": "Email address"
+  },
+  {
+    "name": "phoneNumber",
+    "type": "phone",
+    "scope": "PRIMARY_CUSTOMER",
+    "required": true,
+    "label": "Phone number"
+  },
+  {
+    "name": "hotelName",
+    "type": "text",
+    "scope": "PRIMARY_CUSTOMER",
+    "required": true,
+    "label": "Hotel name for pickup",
+    "conditional": "hotelPickup == true"
+  }
+]
+```
+
+Rules for `inputFields[]`:
+- `firstName`, `lastName`, `email` are always required for PER_PERSON experiences.
+- Add `phoneNumber` when the tour has hotel pickup or the supplier needs to reach customers on the day.
+- Add `hotelName` (with `conditional: "hotelPickup == true"`) whenever `hasHotelPickup: true`.
+- `scope: "ALL_CUSTOMERS"` means you collect this for every traveller in the group (e.g., meal preferences for a dinner cruise).
+- `scope: "PRIMARY_CUSTOMER"` means once per booking.
+- PER_GROUP experiences: collect only `firstName`, `lastName`, `email` for the booking lead.
 
 ---
 
@@ -390,13 +503,16 @@ Stop and return a partial payload with a `stop_reason` field if:
 - The supplier input describes multiple distinct products (different durations AND different prices). These must be separate listings. Stop, identify each product, ask which to process first.
 - Input is fewer than 50 words with no activity list, no timing, and no location.
 
-Do not stop for missing images, missing child pricing, or missing guide language. These are flags, not blockers.
+Do not stop for missing child pricing or missing guide language. These are flags, not blockers.
 
 ---
 
 ## 7. Self-Check Before Output
 
+Run every item below. If any check fails, fix it before returning — do not note the failure in the response.
+
 ```
+--- SCHEMA INTEGRITY ---
 □ tourType is one of: GUIDED_TOUR, SHOW_OR_EVENT, ATTRACTION_TICKET, DESERT_SAFARI, COMBO_TICKET
 □ flowType is one of: NORMAL, SVG, COMBO
 □ inventoryType is one of the four valid values
@@ -408,18 +524,30 @@ Do not stop for missing images, missing child pricing, or missing guide language
 □ pricePerUnit is in dollars/euros — NOT cents (89.00 not 8900)
 □ cancellationPolicy has description (required) and tiers[] with at least one entry
 □ inputFields[] is present and includes at minimum firstName, lastName, email for PER_PERSON experiences
-□ weatherDependent is set for all outdoor/desert/water activities
-□ openingHours is set for ATTRACTION_TICKET experiences, null otherwise
 □ highlights[] has exactly 6 items, each 2-8 words
 □ Every PER_GROUP variant has groupSize set
 □ hasHotelPickup: true → inputFields includes hotelName field
+□ location.coordinates is null — never fill from general knowledge; coordinates are resolved from address by the calling service
+□ _meta.generated_at is null — the calling service stamps the real time
+□ _meta.prompt_version is "intake-v5" — copy this string verbatim
+
+--- AMBIGUITY INTEGRITY ---
 □ [] is never used for an UNKNOWN field — only for confirmed-empty fields
 □ Every CONDITIONAL inclusion has a FAQ entry
 □ Every DEFERRED field has an importantInformation[] entry
 □ ambiguity_flags[] has an entry for every assumption, inference, or default
 □ design_decisions[] has an entry for every non-trivial structural choice
 □ _meta.publish_blocked reflects actual flag state
-□ confidence level matches flag state
-```
+□ confidence level matches flag state (HIGH = zero blocks_publish:true flags; LOW = one or more)
 
-If any check fails, fix it before returning. Do not note the failure in the response — just fix it.
+--- MANDATORY FIELD AUDITS (these fire last; each must produce a flag or explicit non-flag decision) ---
+□ The plausibility audit (Section 3 TYPE A table) has been run against every field — any field that failed plausibility has a corresponding entry in ambiguity_flags[]
+□ cancellationPolicy has been explicitly checked: if the supplier text contains no refund or cancellation terms → must appear in ambiguity_flags[] with blocks_publish: true
+□ variants[*].pricing[CHILD] has been explicitly checked: must appear in ambiguity_flags[] if child pricing was not explicitly stated
+□ blackoutDates has been explicitly checked: if the supplier did not explicitly confirm no closures exist → must appear in ambiguity_flags[]; supplier silence NEVER means "no closures exist"
+□ languages has been explicitly checked: if tourType is GUIDED_TOUR | SHOW_OR_EVENT | DESERT_SAFARI, or ATTRACTION_TICKET with audio guide mentioned, AND language was not stated → must appear in ambiguity_flags[]
+□ startTimes has been explicitly checked: if inventoryType is FIXED_START_* AND supplier did not state specific departure times → must appear in ambiguity_flags[]
+□ openingHours has been explicitly checked: if tourType is ATTRACTION_TICKET AND supplier did not state hours → must appear in ambiguity_flags[]; never infer from general knowledge. For GUIDED_TOUR, DESERT_SAFARI, SHOW_OR_EVENT, COMBO_TICKET — do NOT flag openingHours; the venue's operating hours are managed separately from the tour schedule.
+□ weatherDependent has been explicitly checked: if the experience is a desert safari, river/sea/boat cruise, open-air archaeological site, walking tour, or any outdoor/coastal activity → set weatherDependent: true AND add to ambiguity_flags[] unless the supplier explicitly stated a refund, rebooking, or alternative policy for bad weather. Setting weatherDependent: true alone is NOT sufficient — the missing weather cancellation POLICY is what must be flagged, separately from the field value.
+□ inclusions[] has been explicitly scanned for conditional language: any inclusion or feature described with "subject to availability", "weather permitting", "on the day", "not guaranteed", "may not be available", "if conditions allow", "upon request", or equivalent → must appear as CONDITIONAL in ambiguity_flags[] with blocks_publish: true (unless a remedy is defined), must appear in inclusions[] with hedged language appended (e.g., "Tower access — subject to operational conditions on the day"), and must have a dedicated FAQ entry covering what happens if unavailable.
+```
