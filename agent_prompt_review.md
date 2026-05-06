@@ -342,7 +342,7 @@ If an "SEO Context" section is present in your input and it provides a primary k
 - Case-insensitive match
 - Do NOT flag if the listing title clearly describes the same experience using equivalent terms (e.g. "skip-the-line" vs "skip the line" vs "fast-track")
 
-Flag type: `seo_violation` — this is a warning, not a blocker
+Flag type: `seo_violation` — blocker with `action_required: "regenerate"`, `fix_instruction` stating which keyword phrase is missing and where to include it
 
 ---
 
