@@ -476,15 +476,11 @@ Return an error object (not a listing) if:
 }
 ```
 
-Stop conditions:
+**NEVER stop for**: missing pricing, missing images, missing guide language, `publish_blocked: true`, CONDITIONAL inclusions, DEFERRED fields, or any `ambiguity_flags` entry. These are handled in copy with hedging language and flagged in `publish_verdict.warnings[]`. Missing pricing → add `"pricing_missing"` to `publish_verdict.warnings[]` and generate the full listing.
+
+Stop conditions (exhaustive — only these two):
 - The `tourType` is not one of `GUIDED_TOUR`, `SHOW_OR_EVENT`, `ATTRACTION_TICKET`, `DESERT_SAFARI`, `COMBO_TICKET` — classification must be resolved first
 - Fewer than 3 activities or features are present in the intake data — not enough source material to write honest, specific copy
-
-IMPORTANT: Missing pricing (`variants[0].pricing` absent or no ADULT entry) is NOT a stop condition. Pricing is collected separately by the associate in the review workflow. Generate the full listing and add `"pricing_missing"` to `publish_verdict.warnings[]`. Do not reference specific prices in copy unless a confirmed price exists in the intake.
-
-IMPORTANT: `_meta.publish_blocked: true` is NOT a stop signal for content generation. It means the listing cannot go live yet — it does not prevent you from writing copy. Generate the full listing regardless and surface all blocking issues in `publish_verdict.warnings[]`.
-
-Do NOT stop for: missing pricing, missing images, missing guide language, CONDITIONAL inclusions, DEFERRED fields, or any `ambiguity_flags` entry regardless of its `blocks_publish` value. These are handled in copy with appropriate hedging language and flagged in `publish_verdict.warnings[]`.
 
 ---
 

@@ -116,6 +116,16 @@ def _merge_regen(previous: ListingOutput, regen_raw: dict, scope: list[str]) -> 
     return ListingOutput.model_validate(base)
 
 
+# Fields the prompt explicitly says are not stop conditions — model non-compliance retried
+_NON_STOP_FIELDS = frozenset(["variants[0].pricing"])
+
+_NON_STOP_RETRY_MSG = (
+    "\n\nCORRECTION: Missing pricing is NOT a stop condition. "
+    "Generate the full listing and add \"pricing_missing\" to publish_verdict.warnings[]. "
+    "Do NOT return an error object for missing pricing."
+)
+
+
 def _check_hard_stop(raw: dict) -> None:
     if raw.get("error") is True:
         raise RuntimeError(
@@ -126,7 +136,7 @@ def _check_hard_stop(raw: dict) -> None:
 def _call_with_retry(user_content: str, client: OpenAI, temperature: float) -> dict:
     for attempt in range(2):
         try:
-            return call_json(
+            raw = call_json(
                 client=client,
                 model=get_model("CONTENT"),
                 system_prompt=_SYSTEM_PROMPT,
@@ -136,8 +146,15 @@ def _call_with_retry(user_content: str, client: OpenAI, temperature: float) -> d
         except (json.JSONDecodeError, Exception) as exc:
             if attempt == 1:
                 raise RuntimeError(f"Content Generator failed after 2 attempts: {exc}") from exc
-            user_content = (
-                user_content
-                + "\n\nIMPORTANT: Return valid JSON only. No markdown fences."
-            )
+            user_content += "\n\nIMPORTANT: Return valid JSON only. No markdown fences."
+            continue
+
+        # Model returned error: true for a non-stop condition — retry with explicit correction
+        if raw.get("error") is True and attempt == 0:
+            missing = set(raw.get("missing") or [])
+            if missing and missing.issubset(_NON_STOP_FIELDS):
+                user_content += _NON_STOP_RETRY_MSG
+                continue
+
+        return raw
     return {}
