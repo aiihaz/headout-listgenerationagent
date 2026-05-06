@@ -239,19 +239,35 @@ export function ReviewScreen() {
     }
   };
 
+  const REGEN_TERMINAL = new Set(['ready_for_publish', 'escalated_to_human', 'generation_blocked', 'intake_failed']);
+
   const makeRegenerator = (sectionId: string, fixInstruction?: string) => {
     if (!runId) return undefined;
     return () => new Promise<void>((resolve, reject) => {
+      // Wait for status to leave the current value before we start polling,
+      // so we don't fire on a stale terminal state from before the regen started.
+      let seenInProgress = false;
       api.regenerateSection(runId, sectionId, fixInstruction ?? '').then(() => {
         const pollInterval = setInterval(() => {
           api.getRunStatus(runId).then(status => {
-            if (status.status === 'ready_for_publish' || status.status === 'escalated_to_human') {
+            if (status.status === 'regeneration_in_progress') {
+              seenInProgress = true;
+            }
+            if (seenInProgress && REGEN_TERMINAL.has(status.status)) {
               clearInterval(pollInterval);
-              softReloadData().then(resolve).catch(reject);
+              softReloadData().then(() => {
+                // Clear resolved state for this section so remaining flags show correctly
+                setResolvedSections(prev => {
+                  const next = { ...prev };
+                  delete next[sectionId];
+                  if (runId) localStorage.setItem(`review-resolved-${runId}`, JSON.stringify(next));
+                  return next;
+                });
+                resolve();
+              }).catch(reject);
             }
           }).catch(err => { clearInterval(pollInterval); reject(err); });
         }, 2000);
-        // Safety: resolve after 3 minutes even if poll never fires
         setTimeout(() => { clearInterval(pollInterval); resolve(); }, 180_000);
       }).catch(reject);
     });

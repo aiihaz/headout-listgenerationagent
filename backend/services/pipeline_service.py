@@ -70,6 +70,12 @@ def _sync_pipeline(
         status_q.put(None)  # sentinel — drain loop exits on None
 
 
+_TERMINAL_STATES = frozenset({
+    "ready_for_publish", "escalated_to_human",
+    "generation_blocked", "intake_failed",
+})
+
+
 async def _drain_status(run_id: str, status_q: "queue.Queue[Optional[tuple]]") -> None:
     """Runs in the event loop. Drains the queue and writes each status to Supabase."""
     loop = asyncio.get_running_loop()
@@ -79,6 +85,25 @@ async def _drain_status(run_id: str, status_q: "queue.Queue[Optional[tuple]]") -
             break
         state, error, flag_count = item
         await supabase_service.update_run_status(run_id, state, error, flag_count)
+
+
+async def _drain_status_hold_terminal(
+    run_id: str, status_q: "queue.Queue[Optional[tuple]]"
+) -> "Optional[tuple]":
+    """Like _drain_status but holds the terminal status (not written to DB yet) and returns it.
+    Used by launch_regeneration so artifacts are persisted before the frontend sees the final state."""
+    loop = asyncio.get_running_loop()
+    held: "Optional[tuple]" = None
+    while True:
+        item = await loop.run_in_executor(None, status_q.get)
+        if item is None:
+            break
+        state, error, flag_count = item
+        if state in _TERMINAL_STATES:
+            held = item  # write after _persist_artifacts
+        else:
+            await supabase_service.update_run_status(run_id, state, error, flag_count)
+    return held
 
 
 _ARTIFACT_FILES = {
@@ -229,15 +254,28 @@ async def launch_regeneration(
     section: str,
     fix_instruction: str,
 ) -> None:
-    """Entry point for associate-triggered targeted section regen."""
+    """Entry point for associate-triggered targeted section regen.
+
+    Artifacts are persisted BEFORE the terminal status is written to Supabase so
+    the frontend always fetches up-to-date artifacts when it detects the terminal state.
+    """
     status_q: queue.Queue = queue.Queue()
     loop = asyncio.get_running_loop()
+
+    held_status: list = [None]
+
+    async def drain_and_hold() -> None:
+        held_status[0] = await _drain_status_hold_terminal(run_id, status_q)
 
     pipeline_future = loop.run_in_executor(
         _executor, _sync_regeneration, run_id, section, fix_instruction, status_q
     )
-    await asyncio.gather(pipeline_future, _drain_status(run_id, status_q))
+    await asyncio.gather(pipeline_future, drain_and_hold())
     await _persist_artifacts(run_id)
+    # Write terminal status only after artifacts are safely in Supabase
+    if held_status[0] is not None:
+        state, error, flag_count = held_status[0]
+        await supabase_service.update_run_status(run_id, state, error, flag_count)
 
 
 # ---------------------------------------------------------------------------

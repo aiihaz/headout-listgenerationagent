@@ -40,10 +40,11 @@ export function UploadScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [sampleUsed, setSampleUsed] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [loadingSuppliers, setLoadingSuppliers] = useState(true);
   const supplierRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    api.getSuppliers().then(setSuppliers).catch(() => {});
+    api.getSuppliers().then(s => { setSuppliers(s); setLoadingSuppliers(false); }).catch(() => setLoadingSuppliers(false));
   }, []);
 
   const selectedSupplier = suppliers.find(s => s.id === supplierID);
@@ -314,7 +315,19 @@ export function UploadScreen() {
                   )}
                 </div>
                 <div style={{ maxHeight: 220, overflowY: 'auto' }}>
-                  {filteredSuppliers.length === 0 ? (
+                  {loadingSuppliers ? (
+                    <div style={{ padding: '8px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {[1, 0.7, 0.85].map((w, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--ink10)', flexShrink: 0, animation: 'skeleton-pulse 1.4s ease-in-out infinite', animationDelay: `${i * 0.15}s` }} />
+                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                            <div style={{ height: 12, borderRadius: 4, background: 'var(--ink10)', width: `${w * 100}%`, animation: 'skeleton-pulse 1.4s ease-in-out infinite', animationDelay: `${i * 0.15}s` }} />
+                            <div style={{ height: 10, borderRadius: 4, background: 'var(--ink10)', width: '50%', animation: 'skeleton-pulse 1.4s ease-in-out infinite', animationDelay: `${i * 0.15 + 0.1}s` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : filteredSuppliers.length === 0 ? (
                     <div style={{ padding: 16, textAlign: 'center', color: 'var(--ink60)', fontSize: 13 }}>No suppliers found</div>
                   ) : filteredSuppliers.map(s => (
                     <div key={s.id}
