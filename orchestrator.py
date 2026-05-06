@@ -25,6 +25,7 @@ from agents import (
     serper_agent,
     template_engine,
 )
+from agents.content_generator import GenerationFlaggedError
 from models.intake import IntakeResult
 from models.listing import ListingOutput
 from models.review import ReviewOutput
@@ -152,6 +153,12 @@ def run(
         _notify(ctx.state, status_callback)
         _save(run_dir / "listing.json", listing_raw.model_dump())
         _save(run_dir / "verified_json_ld.json", json_ld)
+    except GenerationFlaggedError as exc:
+        ctx.state = PipelineState.ESCALATED_TO_HUMAN
+        ctx.error = str(exc)
+        _notify(ctx.state, status_callback, ctx.error)
+        _save_escalation(run_dir, ctx)
+        return _result(ctx)
     except RuntimeError as exc:
         ctx.state = PipelineState.GENERATION_BLOCKED
         ctx.error = str(exc)

@@ -9,6 +9,11 @@ from models.intake import IntakeResult
 from models.listing import ContentGeneratorError, ListingOutput
 from models.serper import SerperContext
 
+
+class GenerationFlaggedError(Exception):
+    """Model refused to generate due to missing data that requires human action (not a technical failure)."""
+    pass
+
 _PROMPT_PATH = Path(__file__).parent.parent / "agent_prompt_content_generator.md"
 _SYSTEM_PROMPT = _PROMPT_PATH.read_text()
 
@@ -139,7 +144,9 @@ def _check_hard_stop(raw: dict) -> None:
 
 
 def _call_with_retry(user_content: str, client: OpenAI, temperature: float) -> dict:
-    for attempt in range(2):
+    MAX_ATTEMPTS = 3
+    pricing_correction_appended = False
+    for attempt in range(MAX_ATTEMPTS):
         try:
             raw = call_json(
                 client=client,
@@ -149,15 +156,22 @@ def _call_with_retry(user_content: str, client: OpenAI, temperature: float) -> d
                 temperature=temperature,
             )
         except (json.JSONDecodeError, Exception) as exc:
-            if attempt == 1:
-                raise RuntimeError(f"Content Generator failed after 2 attempts: {exc}") from exc
+            if attempt == MAX_ATTEMPTS - 1:
+                raise RuntimeError(f"Content Generator failed after {MAX_ATTEMPTS} attempts: {exc}") from exc
             user_content += "\n\nIMPORTANT: Return valid JSON only. No markdown fences."
             continue
 
-        # Model returned error: true for a non-stop condition — retry with explicit correction
-        if raw.get("error") is True and attempt == 0 and _is_pricing_only_stop(raw):
-            user_content += _NON_STOP_RETRY_MSG
-            continue
+        # Model wrongly stopped for pricing — append correction once and retry
+        if raw.get("error") is True and _is_pricing_only_stop(raw):
+            if not pricing_correction_appended:
+                user_content += _NON_STOP_RETRY_MSG
+                pricing_correction_appended = True
+                continue
+            # Model still refused after explicit correction — flag for human review, not a hard stop
+            raise GenerationFlaggedError(
+                f"Pricing information missing — raise to supplier or update manually. "
+                f"(model reason: {raw.get('reason')})"
+            )
 
         return raw
     return {}
