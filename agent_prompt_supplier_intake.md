@@ -464,7 +464,7 @@ Generate copy only from what the supplier provided. Do not invent activities, vi
 - Specific departure time counts in prose ("2 departures daily") — extract the times into `startTimes[]` only.
 - Internal capacity numbers used as a marketing claim ("capacity 40 pax") — extract into `maxGroupSize` only; do not write them into description or highlights.
 - Hotel pickup counts or named hotel lists ("pick-up from 15 hotels in Dubai Marina") — set `hasHotelPickup: true` and add a plain line to `importantInformation[]` ("Hotel pick-up included — hotel name required at checkout"); do not name hotels or counts in description.
-- Competitor pricing figures — use competitor references to inform your understanding of the price tier only; do not quote or reference competitor prices in any customer-facing field.
+- Competitor pricing figures — **NEVER extract a competitor's price into `variants[*].pricing[*].pricePerUnit`**. If the supplier document has a section labelled "competitor reference", "competitor pricing", "market comparison", or similar, those prices belong to other operators — they are not this supplier's price. If the only price figure in the document is from such a section, treat pricing as absent (leave `pricePerUnit` null and flag `blocks_publish: true`). Do not use competitor prices in any customer-facing field.
 
 **Cancellation policy handling:**
 
@@ -499,7 +499,7 @@ Examples:
 Stop and return a partial payload with a `stop_reason` field if:
 
 - Experience type is genuinely ambiguous between two classifications after applying the decision tree. Name both interpretations and the single deciding question.
-- Pricing is completely absent with no competitor reference. You cannot estimate without a baseline. Flag as `blocks_publish: true`; do not guess a number.
+- The supplier's own pricing is absent. Competitor reference prices do not count — if the only price in the document came from a competitor reference section, pricing is still absent. Flag as `blocks_publish: true`; leave `pricePerUnit` null; do not guess a number.
 - The supplier input describes multiple distinct products (different durations AND different prices). These must be separate listings. Stop, identify each product, ask which to process first.
 - Input is fewer than 50 words with no activity list, no timing, and no location.
 
