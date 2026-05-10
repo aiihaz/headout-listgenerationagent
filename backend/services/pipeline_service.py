@@ -232,8 +232,8 @@ def _sync_regeneration(
 
         _save(run_dir / "merged_listing_v2.json", _merged_to_dict(new_merged, intake))
 
-        # Re-run review on the updated listing
-        review_result = review_agent.run(intake, new_merged, client, is_regen_pass=True, serper_context=serper_context)
+        # Scoped re-review: only check the regenerated field(s), not the full listing.
+        review_result = review_agent.run(intake, new_merged, client, is_regen_pass=True, serper_context=serper_context, scope=scope)
         _save(run_dir / "review_v2.json", review_result.model_dump())
 
         if review_result.review.overall in ("pass", "conditional_pass"):
