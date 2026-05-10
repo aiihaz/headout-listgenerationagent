@@ -190,25 +190,11 @@ def run(
         _save_final(run_dir, ctx)
         return _result(ctx)
 
-    # FAIL / conditional_pass path — attempt regen for ALL blockers and all content warnings.
-    # Both "regenerate" and "associate_action" blockers are passed; the content generator
-    # receives the fix_instruction for each. If the AI cannot fix a field (e.g. missing supplier
-    # data), the 2nd review will flag it again and it surfaces to the reviewer correctly.
-    all_blockers = ctx.review.review.blockers
-    all_warnings = ctx.review.review.warnings
-
-    # Exclude _meta.* warnings — supplier-level constraints, not regeneratable content
-    content_warnings = [w for w in all_warnings if not w.field.startswith("_meta.")]
-    warning_fix_items = [
-        {"field": w.field, "found": w.issue, "intake_says": "n/a", "fix_instruction": w.suggestion}
-        for w in content_warnings
-    ]
-    blockers = [b.model_dump() for b in all_blockers] + warning_fix_items
-    # Normalise paths: strip array indices so _merge_regen can replace the whole section.
-    # e.g. "listing.highlights[0]" → "listing.highlights" (deduplicated)
-    scope = list(dict.fromkeys(
-        re.sub(r'\[\d+\]', '', b["field"]) for b in blockers
-    ))
+    # FAIL / conditional_pass path — attempt regen up to 2 times before escalating.
+    # Both "regenerate" and "associate_action" blockers are included; the content generator
+    # uses fix_instruction for each. Fields the AI cannot fix are flagged again in subsequent
+    # reviews and surface to the associate correctly.
+    scope, blockers = _regen_scope_and_blockers(ctx.review)
 
     # Nothing to regenerate (e.g. conditional_pass with only _meta warnings)
     if not blockers:
@@ -221,6 +207,7 @@ def run(
     ctx.state = PipelineState.REGENERATION_IN_PROGRESS
     _notify(ctx.state, status_callback)
 
+    # --- Regen attempt 1 ---
     try:
         regen_listing = content_generator.run_targeted_regen(
             ctx.intake, ctx.merged_listing, scope, blockers, client,
@@ -228,7 +215,7 @@ def run(
         )
         ctx.merged_listing = _merge(regen_listing, ctx.json_ld)
         merged_dict = _merged_to_dict(ctx.merged_listing, ctx.intake)
-        _save(run_dir / "merged_listing.json", merged_dict)   # update canonical so UI sees regen output
+        _save(run_dir / "merged_listing.json", merged_dict)
         _save(run_dir / "merged_listing_v2.json", merged_dict)
     except Exception as exc:
         ctx.state = PipelineState.ESCALATED_TO_HUMAN
@@ -237,11 +224,14 @@ def run(
         _save_escalation(run_dir, ctx)
         return _result(ctx)
 
-    # Second review pass
+    # Review pass 2 — scoped to regen 1 fields; not final (may regen again)
     try:
-        ctx.review = review_agent.run(ctx.intake, ctx.merged_listing, client, is_regen_pass=True, serper_context=ctx.serper_context)
+        ctx.review = review_agent.run(
+            ctx.intake, ctx.merged_listing, client,
+            is_regen_pass=False, serper_context=ctx.serper_context, scope=scope,
+        )
         review_dict = ctx.review.model_dump()
-        _save(run_dir / "review.json", review_dict)           # update canonical
+        _save(run_dir / "review.json", review_dict)
         _save(run_dir / "review_v2.json", review_dict)
     except Exception as exc:
         ctx.state = PipelineState.ESCALATED_TO_HUMAN
@@ -250,12 +240,58 @@ def run(
         _save_escalation(run_dir, ctx)
         return _result(ctx)
 
-    post_regen_regen = [b for b in ctx.review.review.blockers if b.action_required == "regenerate"]
+    post_regen1 = [b for b in ctx.review.review.blockers if b.action_required == "regenerate"]
+    if ctx.review.review.overall in ("pass", "conditional_pass") or not post_regen1:
+        remaining_flags = (
+            len(ctx.review.review.blockers)
+            + len([w for w in ctx.review.review.warnings if not w.field.startswith("_meta.")])
+        )
+        ctx.state = PipelineState.READY_FOR_PUBLISH
+        _notify(ctx.state, status_callback, flag_count=remaining_flags)
+        ctx.finished_at = datetime.now(timezone.utc).isoformat()
+        _save_final(run_dir, ctx)
+        return _result(ctx)
+
+    # --- Regen attempt 2 ---
+    scope2, blockers2 = _regen_scope_and_blockers(ctx.review)
+    try:
+        regen_listing = content_generator.run_targeted_regen(
+            ctx.intake, ctx.merged_listing, scope2, blockers2, client,
+            serper_context=ctx.serper_context,
+        )
+        ctx.merged_listing = _merge(regen_listing, ctx.json_ld)
+        merged_dict = _merged_to_dict(ctx.merged_listing, ctx.intake)
+        _save(run_dir / "merged_listing.json", merged_dict)
+        _save(run_dir / "merged_listing_v2.json", merged_dict)
+    except Exception as exc:
+        ctx.state = PipelineState.ESCALATED_TO_HUMAN
+        ctx.error = str(exc)
+        _notify(ctx.state, status_callback, ctx.error)
+        _save_escalation(run_dir, ctx)
+        return _result(ctx)
+
+    # Review pass 3 — scoped to regen 2 fields; final pass, escalates if still failing
+    try:
+        ctx.review = review_agent.run(
+            ctx.intake, ctx.merged_listing, client,
+            is_regen_pass=True, serper_context=ctx.serper_context, scope=scope2,
+        )
+        review_dict = ctx.review.model_dump()
+        _save(run_dir / "review.json", review_dict)
+        _save(run_dir / "review_v2.json", review_dict)
+    except Exception as exc:
+        ctx.state = PipelineState.ESCALATED_TO_HUMAN
+        ctx.error = str(exc)
+        _notify(ctx.state, status_callback, ctx.error)
+        _save_escalation(run_dir, ctx)
+        return _result(ctx)
+
+    post_regen2 = [b for b in ctx.review.review.blockers if b.action_required == "regenerate"]
     remaining_flags = (
         len(ctx.review.review.blockers)
         + len([w for w in ctx.review.review.warnings if not w.field.startswith("_meta.")])
     )
-    if ctx.review.review.overall in ("pass", "conditional_pass") or not post_regen_regen:
+    if ctx.review.review.overall in ("pass", "conditional_pass") or not post_regen2:
         ctx.state = PipelineState.READY_FOR_PUBLISH
         final_flag_count = remaining_flags
     else:
@@ -267,6 +303,18 @@ def run(
     ctx.finished_at = datetime.now(timezone.utc).isoformat()
     _save_final(run_dir, ctx)
     return _result(ctx)
+
+
+def _regen_scope_and_blockers(review: ReviewOutput) -> "tuple[list, list]":
+    """Build (scope_paths, blocker_dicts) from a review result for targeted regeneration."""
+    content_warnings = [w for w in review.review.warnings if not w.field.startswith("_meta.")]
+    warning_fix_items = [
+        {"field": w.field, "found": w.issue, "intake_says": "n/a", "fix_instruction": w.suggestion}
+        for w in content_warnings
+    ]
+    blockers = [b.model_dump() for b in review.review.blockers] + warning_fix_items
+    scope = list(dict.fromkeys(re.sub(r'\[\d+\]', '', b["field"]) for b in blockers))
+    return scope, blockers
 
 
 def _merge(listing: ListingOutput, json_ld: dict) -> ListingOutput:

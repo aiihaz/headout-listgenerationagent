@@ -224,26 +224,44 @@ def _sync_regeneration(
             }
         ]
 
+        # --- Regen attempt 1 ---
         regen_listing = content_generator.run_targeted_regen(
             intake, previous_listing, scope, blockers, client,
             serper_context=serper_context,
         )
         new_merged = _merge(regen_listing, existing_json_ld)
-
         _save(run_dir / "merged_listing_v2.json", _merged_to_dict(new_merged, intake))
 
-        # Scoped re-review: only check the regenerated field(s), not the full listing.
-        review_result = review_agent.run(intake, new_merged, client, is_regen_pass=True, serper_context=serper_context, scope=scope)
+        # Scoped review pass 1 — not final (will try again if still failing)
+        review_result = review_agent.run(intake, new_merged, client, is_regen_pass=False, serper_context=serper_context, scope=scope)
         _save(run_dir / "review_v2.json", review_result.model_dump())
 
-        if review_result.review.overall in ("pass", "conditional_pass"):
+        post_regen1 = [b for b in review_result.review.blockers if b.action_required == "regenerate"]
+        if review_result.review.overall in ("pass", "conditional_pass") or not post_regen1:
             status_q.put(("ready_for_publish", None, 0))
         else:
-            # Second failure after associate-initiated regen — escalate
-            ctx = PipelineRun(run_id=run_id, state=PipelineState.ESCALATED_TO_HUMAN)
-            ctx.review = review_result  # type: ignore[assignment]
-            _save_escalation(run_dir, ctx)
-            status_q.put(("escalated_to_human", None, len(review_result.review.blockers)))
+            # --- Regen attempt 2 ---
+            scope2 = list(dict.fromkeys(re.sub(r'\[\d+\]', '', b.field) for b in review_result.review.blockers))
+            blockers2 = [b.model_dump() for b in review_result.review.blockers]
+
+            regen_listing2 = content_generator.run_targeted_regen(
+                intake, new_merged, scope2, blockers2, client,
+                serper_context=serper_context,
+            )
+            new_merged = _merge(regen_listing2, existing_json_ld)
+            _save(run_dir / "merged_listing_v2.json", _merged_to_dict(new_merged, intake))
+
+            # Scoped review pass 2 — final; escalates if still failing
+            review_result = review_agent.run(intake, new_merged, client, is_regen_pass=True, serper_context=serper_context, scope=scope2)
+            _save(run_dir / "review_v2.json", review_result.model_dump())
+
+            if review_result.review.overall in ("pass", "conditional_pass"):
+                status_q.put(("ready_for_publish", None, 0))
+            else:
+                ctx = PipelineRun(run_id=run_id, state=PipelineState.ESCALATED_TO_HUMAN)
+                ctx.review = review_result  # type: ignore[assignment]
+                _save_escalation(run_dir, ctx)
+                status_q.put(("escalated_to_human", None, len(review_result.review.blockers)))
 
     except Exception as exc:
         status_q.put(("generation_blocked", str(exc), None))
